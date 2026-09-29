@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+"""Run the Jev ops-decision experiment.
+
+    python run.py                                  one run, random scenario
+    python run.py --scenario degraded              one run, named scenario
+    python run.py --scenario ambiguous --seed 1234 reproducible input
+    python run.py --runs 100                       batch, scenarios in rotation
+
+Read-only: it generates data, asks Jev, and records the answer. It never acts on it.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import sys
+from datetime import datetime
+from pathlib import Path
+
+from evaluation.evaluator import FIELDS, aggregate, format_summary, make_record
+from generator.server_state import generate
+from jev.client import ConfigError, JevClient
+from scenarios.definitions import get_scenario, scenario_names
+
+
+def plan_runs(scenario_arg: str | None, runs: int, base_seed: int) -> list[tuple[str, int]]:
+    """Return (scenario, seed) for each run. Fully determined by the arguments."""
+    names = scenario_names()
+    rng = random.Random(base_seed)
+    plan = []
+    for i in range(runs):
+        if scenario_arg and scenario_arg != "random":
+            name = scenario_arg
+        elif scenario_arg == "random" or runs == 1:
+            name = rng.choice(names)
+        else:
+            name = names[i % len(names)]  # balanced rotation for batches
+        plan.append((name, base_seed + i))
+    return plan
+
+
+def format_run(record: dict) -> str:
+    o, e, d = record["observations"], record["expected"], record["decision"]
+    svc = ", ".join(f"{k}={v}" for k, v in o["services"].items())
+    lines = [
+        f"Scenario: {record['scenario']}",
+        f"Seed: {record['seed']}",
+        "",
+        "Server state", "------------",
+        f"CPU:          {o['cpu_pct']}%",
+        f"Memory:       {o['memory_pct']}%",
+        f"Disk:         {o['disk_pct']}%",
+        f"Load:         {o['load_1m']}",
+        f"Net errors:   {o['network_errors_per_min']}/min",
+        f"App errors:   {o['app_error_rate_pct']}%",
+        f"Latency:      {o['api_latency_ms']}ms",
+        f"Services:     {svc}",
+        f"Restarts/h:   {o['restarts_last_hour']}",
+        f"Events:       {'; '.join(o['recent_events']) or 'none'}",
+        "",
+        "Expected", "--------",
+        f"Severity:     {e['severity']}",
+        f"Action:       {e['action']}",
+        f"Human review: {e['human_review']}",
+        "",
+        "Jev", "---",
+    ]
+    if d["status"] == "ok":
+        conf = d["confidence"]
+        p = d["human_review_probability"]
+        lines += [
+            f"Severity:     {d['severity']}",
+            f"Action:       {d['action']}",
+            f"Human review: {d['human_review']}  (P(yes)={p:.2f})",
+            f"Confidence:   {'n/a' if conf is None else f'{conf:.2f}'}",
+        ]
+    else:
+        lines.append(f"Status:       {d['status'].upper()}: {d['message']}")
+    if d["status"] == "error":
+        result = "ERROR (no answer, excluded from accuracy)"
+    elif record["match"]["overall"]:
+        result = "PASS"
+    else:
+        wrong = [f for f in FIELDS if not record["match"][f]]
+        result = "FAIL (" + ", ".join(wrong) + ")"
+    lines += ["", f"Result: {result}"]
+    return "\n".join(lines)
+
+
+def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None, out=print):
+    verbose = (runs == 1) if verbose is None else verbose
+    records = []
+    for i, (name, seed) in enumerate(plan_runs(scenario_arg, runs, base_seed), 1):
+        scenario = get_scenario(name)
+        obs = generate(scenario, seed).to_dict()
+        decision = client.decide(obs)
+        rec = make_record(i, name, seed, obs, scenario.expected, decision)
+        records.append(rec)
+        if verbose:
+            out(format_run(rec))
+        else:
+            tag = "ERROR" if rec["status"] == "error" else ("PASS" if rec["match"]["overall"] else "FAIL")
+            out(f"[{i}/{runs}] {name:<13} seed={seed:<8} {tag}")
+    summary = aggregate(records)
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    base = out_dir / f"{stamp}-{runs}runs"
+    with open(f"{base}.jsonl", "w") as fh:
+        for r in records:
+            fh.write(json.dumps(r) + "\n")
+    meta = {"base_seed": base_seed, "scenario_arg": scenario_arg, "runs": runs,
+            "models": sorted({r["decision"].get("model_version") for r in records
+                              if r["decision"].get("model_version")})}
+    with open(f"{base}-summary.json", "w") as fh:
+        json.dump({"meta": meta, "summary": summary}, fh, indent=2)
+    if runs > 1:
+        out("")
+        out(format_summary(summary))
+    out(f"\nResults: {base}.jsonl")
+    return records, summary
+
+
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--scenario", help=f"one of: {', '.join(scenario_names())}, or 'random'")
+    p.add_argument("--seed", type=int, help="base seed; a random one is chosen and printed if omitted")
+    p.add_argument("--runs", type=int, default=1, help="number of runs (default 1)")
+    p.add_argument("--output-dir", default="results")
+    p.add_argument("--verbose", action="store_true", help="print full detail for every run in a batch")
+    a = p.parse_args(argv)
+    if a.runs < 1:
+        p.error("--runs must be at least 1")
+    if a.scenario and a.scenario != "random" and a.scenario not in scenario_names():
+        p.error(f"unknown scenario {a.scenario!r}; valid: {', '.join(scenario_names())}, random")
+    return a
+
+
+def main(argv=None, client=None) -> int:
+    a = parse_args(argv)
+    if client is None:
+        try:
+            client = JevClient()
+        except ConfigError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+    seed = a.seed if a.seed is not None else random.SystemRandom().randrange(1_000_000)
+    print(f"Base seed: {seed}\n")
+    run_experiment(client, a.scenario, a.runs, seed, a.output_dir, verbose=a.verbose or None)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

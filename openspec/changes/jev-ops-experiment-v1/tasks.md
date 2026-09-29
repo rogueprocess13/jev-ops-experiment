@@ -1,0 +1,75 @@
+## 1. Jev API discovery (blocks everything else)
+
+- [x] 1.1 Inspect the current Jev API/SDK documentation: endpoint or SDK, auth scheme, request/response format, structured-output support, confidence/probability field, rate limits, Python version requirements
+- [x] 1.2 Record findings (source URL, date, confidence field present or absent) in `docs/jev-api-notes.md`
+- [x] 1.3 Confirm environment variable names and minimum Python version from the findings; update design open questions
+
+## 2. Project scaffolding
+
+- [x] 2.1 Create package layout: `generator/`, `scenarios/`, `jev/`, `evaluation/`, `tests/`, `results/.gitkeep`, each package with `__init__.py`
+- [x] 2.2 Add `requirements.txt` (Jev SDK or HTTP client per 1.1, `python-dotenv`, `pytest`)
+- [x] 2.3 Add `.env.example` with placeholder values for every required variable
+- [x] 2.4 Confirm `.gitignore` covers `.env` and `results/*` (keeping `.gitkeep`)
+
+## 3. Scenario catalogue and ground truth
+
+- [x] 3.1 Define allowed value sets (severity, action, human-review) and an `Expected` dataclass in `scenarios/definitions.py`
+- [x] 3.2 Define `Scenario` dataclass (name, metric profile, expected, rationale) and a lookup that lists valid names on error
+- [x] 3.3 Define `healthy`, `degraded`, `critical` scenarios with expected outcomes and rationale
+- [x] 3.4 Define `ambiguous` and `contradictory` scenarios with expected outcomes and explicit written rationale for each choice
+
+## 4. Server-state generator
+
+- [x] 4.1 Define the `ServerState` dataclass with all required fields and a JSON-safe `to_dict`
+- [x] 4.2 Implement generation from a latent stress value plus bounded noise, using a private `random.Random(seed)`
+- [x] 4.3 Implement service statuses and recent events/restarts consistent with each scenario
+- [x] 4.4 Implement the deliberately conflicting signal patterns for `contradictory`
+- [x] 4.5 Add value clamping so every field stays in its valid range
+
+## 5. Jev adapter and minimal end-to-end path
+
+- [x] 5.1 Define `Decision` result type with severity, action, human_review, confidence, latency_ms, raw_response and status (`ok`, `invalid`, `error`)
+- [x] 5.2 Build the bounded-decision prompt/request from observations, per the Jev docs
+- [x] 5.3 Implement `decide()` in `jev/client.py` with response validation against the allowed sets (no coercion)
+- [x] 5.4 Implement env-based config loading with a clear error naming any missing variable
+- [x] 5.5 Implement bounded retries for transient failures, returning an `error` result on exhaustion
+- [x] 5.6 Ensure credentials never appear in returned or stored data
+- [ ] 5.7 Minimal `run.py`: one scenario, generate, call Jev, print decision and compare (smoke-test against real Jev once)
+
+## 6. Evaluation
+
+- [x] 6.1 Implement `compare(expected, decision)` returning per-field and overall correctness
+- [x] 6.2 Implement `aggregate(records)`: totals, accuracy by field and scenario, confidence overall/correct/incorrect, latency stats, invalid and error categories, empty-input safe
+- [x] 6.3 Implement text summary rendering (`Overall`, `By scenario`, by decision type, confidence, latency)
+
+## 7. Runner CLI and persistence
+
+- [x] 7.1 Add `argparse` options `--scenario`, `--seed`, `--runs`, `--output-dir`; validate scenario names
+- [x] 7.2 Implement per-run output in the format from PLAN.md (scenario, seed, server state, expected, Jev, confidence, PASS/FAIL with differing fields)
+- [x] 7.3 Implement batch mode: balanced round-robin over scenarios, per-run seeds derived from a base seed and recorded, continue on per-run errors
+- [x] 7.4 Write per-run JSONL and summary JSON to timestamped files under `results/`
+- [x] 7.5 Verify a single run replays identically from a recorded scenario and seed
+- [x] 7.6 Print the batch summary at the end; confirm printed figures equal the summary file
+
+## 8. Tests
+
+- [x] 8.1 Scenario generation tests: all fields present and in range, correlation and severity ordering across many seeds
+- [x] 8.2 Seed determinism tests: same seed equal, different seed differs, global RNG untouched
+- [x] 8.3 Expected-outcome definition tests: all required scenarios exist, values in allowed sets, rationale present, outcome independent of seed
+- [x] 8.4 Comparison logic tests: full match, partial match, invalid decision
+- [x] 8.5 Aggregation tests: counts, per-scenario and per-field accuracy, confidence split, no-confidence case, empty input, invalid/error categories
+- [x] 8.6 Runner tests using a fake adapter with scripted decisions (no test asserts real Jev answers)
+- [x] 8.7 Confirm `pytest` passes offline with no credentials
+
+## 9. Documentation and packaging
+
+- [x] 9.1 Write README: plain-language description, experimental-benchmark disclaimer, prerequisites, Python version, install, Jev config and env vars, single run, batch, seed reproduction, results storage
+- [x] 9.2 Document the seed/non-determinism caveat and the rationale for ambiguous/contradictory expectations
+- [x] 9.3 Add minimal `Dockerfile` (slim Python, `ENTRYPOINT ["python", "run.py"]`, no baked credentials, add `.dockerignore` excluding `.env` and `results/`)
+- [ ] 9.4 Build and run the image once with env vars and a mounted results directory
+
+## 10. First experiment and wrap-up
+
+- [ ] 10.1 Run `python run.py --runs 100` against real Jev and keep the JSONL and summary locally
+- [ ] 10.2 Review ambiguous/contradictory results and note observations in the README or a `docs/` findings note (calculated from real output only)
+- [ ] 10.3 Update `PLAN.md` status to implemented and tag v0.1.0
