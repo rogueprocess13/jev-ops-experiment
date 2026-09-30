@@ -259,3 +259,7 @@ tests/                    offline unit tests
 docs/jev-api-notes.md     Jev API notes
 openspec/                 specs, design and tasks for this project
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE). This project is not affiliated with or endorsed by TypeSafe AI (Jev) or LF Edge.
