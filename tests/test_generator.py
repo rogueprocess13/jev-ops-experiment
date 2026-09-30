@@ -76,3 +76,75 @@ def test_contradictory_signals_conflict():
         assert quiet_but_failing or busy_but_clean
         seen.add("q" if quiet_but_failing else "b")
     assert seen == {"q", "b"}  # both variants occur
+
+
+# --- application logs ---------------------------------------------------------
+
+from generator.app_logs import LEVELS
+from scenarios.definitions import get_scenario
+
+
+def _levels(name, seed):
+    return {x["level"] for x in generate(name, seed).logs}
+
+
+def test_logs_present_and_well_formed():
+    for name in scenario_names():
+        for seed in range(30):
+            logs = generate(name, seed).logs
+            assert logs
+            for x in logs:
+                assert set(x) == {"ts", "level", "service", "message"}
+                assert x["level"] in LEVELS and x["message"]
+            assert [x["ts"] for x in logs] == sorted(x["ts"] for x in logs)
+
+
+def test_logs_are_seed_deterministic():
+    assert generate("critical", 9).logs == generate("critical", 9).logs
+    assert generate("critical", 9).logs != generate("critical", 10).logs
+
+
+def test_logs_match_scenario_severity():
+    for seed in SEEDS:
+        assert not _levels("healthy", seed) & {"ERROR", "FATAL"}
+        assert _levels("critical", seed) & {"ERROR", "FATAL"}
+
+
+def test_error_logs_name_the_affected_service():
+    for seed in SEEDS:
+        d = generate("critical", seed)
+        bad = {n for n, st in d.services.items() if st != "healthy"}
+        crash = [x for x in d.logs if x["level"] == "FATAL" or "exited" in x["message"]]
+        assert all(x["service"] in bad for x in crash)
+
+
+def test_hung_worker_evidence_is_in_logs():
+    for seed in SEEDS:
+        d = generate("hung_worker", seed)
+        assert d.services["worker"] == "degraded"
+        assert set(d.services.values()) <= {"healthy", "degraded"}
+        assert d.cpu_pct < 50
+        assert any(x["service"] == "worker" and x["level"] == "ERROR" for x in d.logs)
+        assert not any(x["service"] == "worker" and x["level"] == "INFO" for x in d.logs)
+
+
+def test_log_only_errors_metrics_look_healthy():
+    for seed in SEEDS:
+        d = generate("log_only_errors", seed)
+        assert set(d.services.values()) == {"healthy"}
+        assert d.cpu_pct < 50 and d.app_error_rate_pct < 2 and d.api_latency_ms < 300
+        assert sum(1 for x in d.logs if x["level"] == "ERROR") >= 4
+
+
+def test_logs_do_not_leak_scenario_or_answer():
+    words = set(scenario_names()) | {"expected", "scenario", "restart the", "escalate"}
+    for name in scenario_names():
+        for seed in range(30):
+            text = " ".join(x["message"] for x in generate(name, seed).logs).lower()
+            assert not any(w in text for w in words), (name, seed)
+
+
+def test_adding_logs_did_not_change_metrics_for_old_scenarios():
+    # Logs are generated after metrics, so metrics for a seed are stable.
+    d = generate("degraded", 1234)
+    assert (d.cpu_pct, d.memory_pct, d.api_latency_ms) == (62.2, 74.1, 610)

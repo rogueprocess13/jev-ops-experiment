@@ -5,6 +5,7 @@ One request per decision, three typed questions:
   severity      -> choice
   action        -> choice
   human_review  -> noul (probability of "yes"; yes if >= HUMAN_REVIEW_THRESHOLD)
+  probable_cause -> choice (diagnosis; scored separately from the decision)
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ from typing import Callable
 
 import requests
 
-from scenarios.definitions import ACTIONS, HUMAN_REVIEW, SEVERITIES
+from scenarios.definitions import ACTIONS, CAUSES, HUMAN_REVIEW, SEVERITIES
 
 DEFAULT_URL = "https://thejevai.com/v1/systemone"
 DEFAULT_MODEL = "jev-latest"
@@ -45,6 +46,19 @@ QUESTIONS = {
             "investigate": "Look into the cause before changing anything.",
             "restart": "Restart the affected service.",
             "escalate": "Hand the incident to a human on-call engineer immediately.",
+        },
+    },
+    "probable_cause": {
+        "type": "choice",
+        "instructions": "What is the most likely cause of the current condition?",
+        "criteria": {
+            "none": "Nothing is wrong.",
+            "resource_exhaustion": "CPU, memory, disk or capacity is running out.",
+            "dependency_failure": "A service this one depends on is failing or unreachable.",
+            "application_bug": "A defect in the application code.",
+            "configuration": "A wrong or changed configuration setting.",
+            "network": "Network connectivity or packet loss.",
+            "unknown": "The evidence is too weak or conflicting to name a cause.",
         },
     },
     "human_review": {
@@ -98,6 +112,7 @@ class Decision:
     severity: str | None = None
     action: str | None = None
     human_review: str | None = None
+    probable_cause: str | None = None
     confidence: float | None = None  # mean of severity and action confidence
     field_confidence: dict = field(default_factory=dict)
     human_review_probability: float | None = None
@@ -127,7 +142,7 @@ def parse_response(body: dict) -> Decision:
     answers = body["answers"]
     out = Decision(status=STATUS_OK, raw_response=body, model_version=body.get("model"))
 
-    for qid, allowed in (("severity", SEVERITIES), ("action", ACTIONS)):
+    for qid, allowed in (("severity", SEVERITIES), ("action", ACTIONS), ("probable_cause", CAUSES)):
         a = answers.get(qid)
         if not isinstance(a, dict) or a.get("choice") not in allowed:
             return bad(f"{qid}: missing or out-of-set choice ({a!r})")
@@ -143,7 +158,9 @@ def parse_response(body: dict) -> Decision:
     out.human_review_probability = p
     out.human_review = HUMAN_REVIEW[0] if p >= HUMAN_REVIEW_THRESHOLD else HUMAN_REVIEW[1]
 
-    confs = [c for c in out.field_confidence.values() if c is not None]
+    # Overall confidence is for the operational decision only (severity, action).
+    confs = [out.field_confidence[q] for q in ("severity", "action")
+             if out.field_confidence.get(q) is not None]
     out.confidence = sum(confs) / len(confs) if confs else None
     return out
 

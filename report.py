@@ -14,7 +14,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from evaluation.evaluator import FIELDS, aggregate, format_summary
+from evaluation.evaluator import ALL_FIELDS, aggregate, format_summary
 
 
 def load(path: Path) -> list[dict]:
@@ -22,7 +22,7 @@ def load(path: Path) -> list[dict]:
 
 
 def latest(results_dir: Path) -> Path:
-    files = sorted(results_dir.glob("*runs.jsonl"))
+    files = sorted(results_dir.glob("*runs*.jsonl"))
     if not files:
         raise SystemExit(f"no *runs.jsonl files in {results_dir}. Run run.py first.")
     return files[-1]
@@ -35,7 +35,9 @@ def choices(records: list[dict], field: str) -> str:
 
 def render(records: list[dict], source: str) -> str:
     s = aggregate(records)
-    out = [f"# Jev ops experiment report", "", f"Source: `{source}`", "",
+    logs = "yes" if all(r.get("include_logs", True) for r in records) else "no (metrics only)"
+    out = ["# Jev ops experiment report", "", f"Source: `{source}`", "",
+           f"Application logs sent to Jev: {logs}", "",
            "```text", format_summary(s), "```", "",
            "## What Jev chose, by scenario", "",
            "Expected value first, then everything Jev returned for that scenario.", ""]
@@ -44,14 +46,14 @@ def render(records: list[dict], source: str) -> str:
         exp = rs[0]["expected"]
         out += [f"### {name} ({len(rs)} runs)", "",
                 "| Field | Expected | Jev returned |", "|---|---|---|"]
-        out += [f"| {f} | {exp[f]} | {choices(rs, f)} |" for f in FIELDS]
+        out += [f"| {f} | {exp.get(f, 'n/a')} | {choices(rs, f)} |" for f in ALL_FIELDS]
         out.append("")
 
     bad = [r for r in records if r["status"] != "ok" or not r["match"]["overall"]]
-    out += [f"## Misses ({len(bad)})", ""]
+    out += [f"## Misses ({len(bad)})", "", "A miss is a wrong operational decision. Cause is shown but does not decide PASS/FAIL.", ""]
     if bad:
-        out += ["| Run | Scenario | Seed | Status | Severity (exp/got) | Action (exp/got) | Human (exp/got) | Conf |",
-                "|---|---|---|---|---|---|---|---|"]
+        out += ["| Run | Scenario | Seed | Status | Severity (exp/got) | Action (exp/got) | Human (exp/got) | Cause (exp/got) | Conf |",
+                "|---|---|---|---|---|---|---|---|---|"]
         for r in bad:
             d, e = r["decision"], r["expected"]
             conf = d.get("confidence")
@@ -59,6 +61,7 @@ def render(records: list[dict], source: str) -> str:
                 f"| {r['run']} | {r['scenario']} | {r['seed']} | {r['status']} | "
                 f"{e['severity']}/{d.get('severity') or '-'} | {e['action']}/{d.get('action') or '-'} | "
                 f"{e['human_review']}/{d.get('human_review') or '-'} | "
+                f"{e.get('probable_cause', 'n/a')}/{d.get('probable_cause') or '-'} | "
                 f"{'n/a' if conf is None else f'{conf:.2f}'} |")
         out += ["", "Replay one: `python run.py --scenario <scenario> --seed <seed>`"]
     else:

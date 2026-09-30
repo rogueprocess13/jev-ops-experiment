@@ -8,8 +8,9 @@ from jev import client as jc
 from jev.client import ConfigError, JevClient, JevConfig, parse_response
 
 
-def body(sev="high", act="investigate", hr=0.2, conf=(0.8, 0.6)):
+def body(sev="high", act="investigate", hr=0.2, conf=(0.8, 0.6), cause="application_bug"):
     return {"model": "jev-x", "answers": {
+        "probable_cause": {"type": "choice", "choice": cause, "confidence": 0.1},
         "severity": {"type": "choice", "choice": sev, "probabilities": {sev: 1.0}, "confidence": conf[0]},
         "action": {"type": "choice", "choice": act, "probabilities": {act: 1.0}, "confidence": conf[1]},
         "human_review": {"type": "noul", "noul": hr}}}
@@ -43,7 +44,8 @@ def make(responses, retries=2):
 def test_parse_valid():
     d = parse_response(body())
     assert (d.status, d.severity, d.action, d.human_review) == ("ok", "high", "investigate", "no")
-    assert d.confidence == pytest.approx(0.7)
+    assert d.confidence == pytest.approx(0.7)  # cause confidence (0.1) excluded
+    assert d.probable_cause == "application_bug" and d.field_confidence["probable_cause"] == 0.1
     assert d.human_review_probability == 0.2 and d.model_version == "jev-x"
 
 
@@ -55,6 +57,10 @@ def test_human_review_threshold():
 def test_out_of_set_choice_is_invalid_not_coerced():
     d = parse_response(body(sev="catastrophic"))
     assert d.status == "invalid" and d.severity is None
+
+
+def test_out_of_set_cause_is_invalid():
+    assert parse_response(body(cause="gremlins")).status == "invalid"
 
 
 def test_missing_fields_invalid():
@@ -78,7 +84,7 @@ def test_decide_records_latency_and_no_secret():
     assert d.status == "ok" and d.latency_ms is not None and d.latency_ms >= 0
     assert "SECRET-KEY" not in json.dumps(d.to_dict())
     assert calls[0][0]["Authorization"] == "Bearer SECRET-KEY"
-    assert set(calls[0][1]["questions"]) == {"severity", "action", "human_review"}
+    assert set(calls[0][1]["questions"]) == {"severity", "action", "human_review", "probable_cause"}
 
 
 def test_request_does_not_contain_scenario_or_expected():

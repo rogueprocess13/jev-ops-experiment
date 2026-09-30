@@ -11,9 +11,11 @@ Experimental benchmark: can Jev AI make bounded operational decisions (severity,
 - **Expected outcomes are hand-written** in `scenarios/definitions.py`. Never derive them from Jev or any other LLM, and never make them depend on generated values or the seed.
 - **Tests never assert what real Jev answers.** Jev's output is what the experiment measures. Use `FakeClient` from `tests/helpers.py` or canned HTTP responses. Tests must pass offline with no API key.
 - **Jev sees only the observations.** Never put the scenario name, expected outcome, or any hint in the request (`test_request_does_not_contain_scenario_or_expected` guards this).
+- **PASS/FAIL is the operational decision only** (severity, action, human review). `probable_cause` is a diagnosis, scored separately (`DIAGNOSIS_FIELDS` in `evaluation/evaluator.py`). Do not fold it into `overall`.
 - **Do not coerce or guess.** An out-of-set Jev reply is `invalid` and counts as incorrect. A failed call is `error` and is excluded from accuracy.
 - **Never hard-code or invent results.** Every reported figure is computed from the run records.
-- **All randomness comes from `random.Random(seed)`** inside the generator. Never use the global RNG.
+- **All randomness comes from `random.Random(seed)`** inside the generator. Never use the global RNG. Logs are generated *after* metrics and services, so adding log kinds never changes a seed's metrics. Keep it that way.
+- **Log lines must not leak the answer.** No scenario names, and no wording that tells Jev what to do (`test_logs_do_not_leak_scenario_or_answer`).
 - **Secrets stay in `.env`** (git-ignored). Never log, store or commit `JEV_API_KEY`. `Decision` objects and result files must not contain it.
 - **All Jev-specific code lives in `jev/client.py`.** Nothing else may import HTTP or API details. API facts are in `docs/jev-api-notes.md`. Check the current docs at https://thejevai.com/docs before changing request or response handling. Do not guess parameters.
 
@@ -25,6 +27,7 @@ report.py                  Markdown report from a results JSONL
 run-all.sh                 venv, install, tests, key check, batch, report
 scenarios/definitions.py   scenarios, expected outcomes, rationale, metric profiles
 generator/server_state.py  seeded, scenario-correlated observations
+generator/app_logs.py      seeded, templated application logs (called by server_state)
 jev/client.py              Jev adapter (only Jev-specific code)
 evaluation/evaluator.py    compare, aggregate, summary text (pure functions)
 tests/                     offline unit tests
@@ -39,7 +42,8 @@ openspec/                  proposal, design, specs, tasks for the project
 | Install | `python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt` |
 | Tests (offline) | `pytest` |
 | One run | `python run.py --scenario degraded --seed 1234` |
-| Batch | `python run.py --runs 100` |
+| Batch | `python run.py --runs 70` (multiple of 7 = balanced) |
+| Metrics only | `python run.py --runs 70 --no-logs` |
 | Everything | `./run-all.sh [runs]` |
 | Report | `python report.py [results/file.jsonl]` |
 

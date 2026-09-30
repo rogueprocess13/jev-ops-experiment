@@ -4,7 +4,8 @@
     python run.py                                  one run, random scenario
     python run.py --scenario degraded              one run, named scenario
     python run.py --scenario ambiguous --seed 1234 reproducible input
-    python run.py --runs 100                       batch, scenarios in rotation
+    python run.py --runs 70                        batch, scenarios in rotation
+    python run.py --runs 70 --no-logs              same, but metrics only (no logs)
 
 Read-only: it generates data, asks Jev, and records the answer. It never acts on it.
 """
@@ -39,6 +40,23 @@ def plan_runs(scenario_arg: str | None, runs: int, base_seed: int) -> list[tuple
     return plan
 
 
+MAX_LOG_LINES = 15
+
+
+def format_logs(logs, included: bool) -> list[str]:
+    if not included:
+        return ["Logs", "----", "not sent to Jev (--no-logs)"]
+    logs = logs or []
+    counts = {lvl: sum(1 for x in logs if x["level"] == lvl) for lvl in ("FATAL", "ERROR", "WARN", "INFO")}
+    head = ", ".join(f"{n} {lvl}" for lvl, n in counts.items() if n) or "none"
+    lines = [f"Logs (last 15 min): {head}", "----"]
+    for x in logs[-MAX_LOG_LINES:]:
+        lines.append(f"{x['ts'][11:19]} {x['level']:<5} {x['service']:<8} {x['message']}")
+    if len(logs) > MAX_LOG_LINES:
+        lines.append(f"... {len(logs) - MAX_LOG_LINES} older lines not shown (all were sent to Jev)")
+    return lines
+
+
 def format_run(record: dict) -> str:
     o, e, d = record["observations"], record["expected"], record["decision"]
     svc = ", ".join(f"{k}={v}" for k, v in o["services"].items())
@@ -58,10 +76,13 @@ def format_run(record: dict) -> str:
         f"Restarts/h:   {o['restarts_last_hour']}",
         f"Events:       {'; '.join(o['recent_events']) or 'none'}",
         "",
+        *format_logs(o.get("logs"), record.get("include_logs", True)),
+        "",
         "Expected", "--------",
         f"Severity:     {e['severity']}",
         f"Action:       {e['action']}",
         f"Human review: {e['human_review']}",
+        f"Cause:        {e.get('probable_cause', 'n/a')}",
         "",
         "Jev", "---",
     ]
@@ -72,6 +93,7 @@ def format_run(record: dict) -> str:
             f"Severity:     {d['severity']}",
             f"Action:       {d['action']}",
             f"Human review: {d['human_review']}  (P(yes)={p:.2f})",
+            f"Cause:        {d.get('probable_cause')}",
             f"Confidence:   {'n/a' if conf is None else f'{conf:.2f}'}",
         ]
     else:
@@ -84,17 +106,24 @@ def format_run(record: dict) -> str:
         wrong = [f for f in FIELDS if not record["match"][f]]
         result = "FAIL (" + ", ".join(wrong) + ")"
     lines += ["", f"Result: {result}"]
+    if d["status"] == "ok" and "probable_cause" in record["match"]:
+        verdict = "correct" if record["match"]["probable_cause"] else "incorrect"
+        lines.append(f"Cause:  {verdict} (scored separately)")
     return "\n".join(lines)
 
 
-def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None, out=print):
+def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None, out=print,
+                   include_logs=True):
     verbose = (runs == 1) if verbose is None else verbose
     records = []
     for i, (name, seed) in enumerate(plan_runs(scenario_arg, runs, base_seed), 1):
         scenario = get_scenario(name)
         obs = generate(scenario, seed).to_dict()
+        if not include_logs:  # ablation: same metrics, logs withheld from Jev
+            obs.pop("logs")
         decision = client.decide(obs)
         rec = make_record(i, name, seed, obs, scenario.expected, decision)
+        rec["include_logs"] = include_logs
         records.append(rec)
         if verbose:
             out(format_run(rec))
@@ -106,11 +135,12 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    base = out_dir / f"{stamp}-{runs}runs"
+    base = out_dir / f"{stamp}-{runs}runs{'' if include_logs else '-nologs'}"
     with open(f"{base}.jsonl", "w") as fh:
         for r in records:
             fh.write(json.dumps(r) + "\n")
     meta = {"base_seed": base_seed, "scenario_arg": scenario_arg, "runs": runs,
+            "include_logs": include_logs,
             "models": sorted({r["decision"].get("model_version") for r in records
                               if r["decision"].get("model_version")})}
     with open(f"{base}-summary.json", "w") as fh:
@@ -129,6 +159,8 @@ def parse_args(argv=None):
     p.add_argument("--runs", type=int, default=1, help="number of runs (default 1)")
     p.add_argument("--output-dir", default="results")
     p.add_argument("--verbose", action="store_true", help="print full detail for every run in a batch")
+    p.add_argument("--no-logs", action="store_true",
+                   help="withhold application logs from Jev (metrics only), to compare against runs with logs")
     a = p.parse_args(argv)
     if a.runs < 1:
         p.error("--runs must be at least 1")
@@ -147,7 +179,8 @@ def main(argv=None, client=None) -> int:
             return 2
     seed = a.seed if a.seed is not None else random.SystemRandom().randrange(1_000_000)
     print(f"Base seed: {seed}\n")
-    run_experiment(client, a.scenario, a.runs, seed, a.output_dir, verbose=a.verbose or None)
+    run_experiment(client, a.scenario, a.runs, seed, a.output_dir, verbose=a.verbose or None,
+                   include_logs=not a.no_logs)
     return 0
 
 

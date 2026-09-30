@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Whole experiment in one go: venv -> install -> tests -> key check -> batch run -> report.
 #
-#   ./run-all.sh              100 runs
-#   ./run-all.sh 20           20 runs
+#   ./run-all.sh              70 runs (10 per scenario)
+#   ./run-all.sh 21           21 runs
+#   ./run-all.sh 70 --no-logs metrics only, to compare with a run that has logs
 #   ./run-all.sh 50 --seed 1234 --scenario contradictory   extra args go to run.py
 #
 # Set SKIP_TESTS=1 to skip pytest.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-RUNS="${1:-100}"
+RUNS="${1:-70}"
 [[ $# -gt 0 ]] && shift
 [[ "$RUNS" =~ ^[0-9]+$ && "$RUNS" -ge 1 ]] || { echo "usage: $0 [runs] [run.py args...]" >&2; exit 1; }
 

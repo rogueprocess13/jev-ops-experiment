@@ -1,6 +1,6 @@
 import pytest
 
-from scenarios.definitions import (ACTIONS, HUMAN_REVIEW, REQUIRED_SCENARIOS, SCENARIOS, SEVERITIES,
+from scenarios.definitions import (ACTIONS, CAUSES, HUMAN_REVIEW, REQUIRED_SCENARIOS, SCENARIOS, SEVERITIES,
                                    Expected, get_scenario, scenario_names)
 
 
@@ -20,15 +20,18 @@ def test_expected_values_in_allowed_sets():
         assert s.expected.severity in SEVERITIES
         assert s.expected.action in ACTIONS
         assert s.expected.human_review in HUMAN_REVIEW
+        assert s.expected.probable_cause in CAUSES
 
 
 def test_expected_rejects_bad_values():
     with pytest.raises(ValueError):
-        Expected("meh", "observe", "no")
+        Expected("meh", "observe", "no", "none")
     with pytest.raises(ValueError):
-        Expected("normal", "reboot", "no")
+        Expected("normal", "reboot", "no", "none")
     with pytest.raises(ValueError):
-        Expected("normal", "observe", "maybe")
+        Expected("normal", "observe", "maybe", "none")
+    with pytest.raises(ValueError):
+        Expected("normal", "observe", "no", "gremlins")
 
 
 def test_rationale_and_profiles_present():

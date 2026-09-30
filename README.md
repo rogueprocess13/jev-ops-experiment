@@ -12,12 +12,14 @@ Prepared for discussion in the LF Edge AIOps forum.
 Known scenario -> Known server state -> Jev -> Decision -> Compare with independent expected outcome
 ```
 
-- **Scenarios** (`scenarios/definitions.py`): `healthy`, `degraded`, `critical`, `ambiguous`, `contradictory`. Each has an expected outcome written by hand in code, with a written rationale. No LLM is used to produce it. It does not depend on the generated numbers or the seed.
+- **Scenarios** (`scenarios/definitions.py`): `healthy`, `degraded`, `critical`, `ambiguous`, `contradictory`, `hung_worker`, `log_only_errors`. Each has an expected outcome written by hand in code, with a written rationale. No LLM is used to produce it. It does not depend on the generated numbers or the seed.
 - **Generator** (`generator/server_state.py`): builds CPU, memory, disk, load, network errors, application error rate, API latency, service statuses and recent restarts/events. Metrics are derived from a shared stress level for the scenario, so they move together. `contradictory` deliberately breaks this, with two patterns: quiet hosts with a failing service, and a busy host with no symptoms.
+- **Application logs** (`generator/app_logs.py`): each run also includes 15 minutes of application log lines (INFO, WARN, ERROR, FATAL) that match the scenario and name the affected service. They are built from fixed templates, so the seed fixes them too. In `contradictory`, the logs can contradict the metrics as well (a service logs crashes and "health check ok").
 - **Jev adapter** (`jev/client.py`): the only module that talks to Jev. Jev is asked three typed questions in one request:
   - severity: `normal`, `degraded`, `high`, `critical`
   - action: `observe`, `investigate`, `restart`, `escalate`
   - human review required: `yes` or `no`
+  - probable cause: `none`, `resource_exhaustion`, `dependency_failure`, `application_bug`, `configuration`, `network`, `unknown`
 - **Evaluator** (`evaluation/evaluator.py`): compares each field, then aggregates accuracy, confidence and latency. Every figure is calculated from the real results.
 
 Jev sees only the server observations. It never sees the scenario name or the expected answer.
@@ -26,15 +28,32 @@ The API details used are in [docs/jev-api-notes.md](docs/jev-api-notes.md).
 
 ### The expected outcomes, and why
 
-| Scenario | Severity | Action | Human review |
-|---|---|---|---|
-| healthy | normal | observe | no |
-| degraded | high | investigate | no |
-| critical | critical | escalate | yes |
-| ambiguous | degraded | investigate | yes |
-| contradictory | degraded | investigate | yes |
+| Scenario | Severity | Action | Human review | Probable cause |
+|---|---|---|---|---|
+| healthy | normal | observe | no | none |
+| degraded | high | investigate | no | resource_exhaustion |
+| critical | critical | escalate | yes | resource_exhaustion |
+| ambiguous | degraded | investigate | yes | unknown |
+| contradictory | degraded | investigate | yes | unknown |
+| hung_worker | high | restart | no | application_bug |
+| log_only_errors | high | investigate | yes | application_bug |
+
+**Probable cause is scored separately.** A run is PASS when severity, action and human review are all right, because that is the operational decision. The cause is Jev's diagnosis: does it read the logs and metrics correctly? It gets its own accuracy line in the summary and report, and a wrong cause does not turn a PASS into a FAIL. `dependency_failure`, `configuration` and `network` are not the expected answer for any scenario. They are there so Jev has plausible wrong options to choose.
 
 `healthy`, `degraded` and `critical` have fairly clear answers. `ambiguous` and `contradictory` are **judgment calls**: the evidence does not point cleanly to one action, so the expected outcome is our reasoned choice (do not restart or escalate on weak or conflicting evidence, investigate, and ask a human). A different but sensible answer there is not necessarily a model failure. Look at the per-field results and the raw responses, not only the pass rate. The reasoning for each is next to its definition.
+
+`hung_worker` and `log_only_errors` are the scenarios where **the logs carry the evidence**. In `hung_worker` the host looks quiet, but the worker logs show a deadlock, and a restart is the standard fix. It is the only scenario that expects `restart`. In `log_only_errors` every metric looks healthy, but the logs show checkout failing after a deploy. A restart will not fix a code bug, so the answer is investigate plus human review.
+
+### Do the logs help? (`--no-logs`)
+
+`--no-logs` sends Jev the same metrics without the logs. The seed still fixes everything, so you can run the same batch both ways and compare:
+
+```bash
+python run.py --runs 70 --seed 1000
+python run.py --runs 70 --seed 1000 --no-logs
+```
+
+Without logs, Jev cannot see the evidence for `hung_worker` and `log_only_errors`, so expect those to fail. The comparison shows how much the logs contribute. Results from a metrics-only run are saved with a `-nologs` suffix, and the report states which mode was used.
 
 ## Prerequisites
 
@@ -65,8 +84,9 @@ cp .env.example .env      # then edit .env and set JEV_API_KEY
 ## Run everything
 
 ```bash
-./run-all.sh            # 100 runs
-./run-all.sh 20         # 20 runs
+./run-all.sh            # 70 runs (10 per scenario)
+./run-all.sh 21         # 21 runs
+./run-all.sh 70 --no-logs
 ./run-all.sh 50 --scenario contradictory --seed 1234
 ```
 
@@ -78,12 +98,13 @@ This creates `.venv`, installs dependencies, runs the offline tests, checks your
 python run.py                                   # one run, random scenario
 python run.py --scenario degraded               # one run, named scenario
 python run.py --scenario ambiguous --seed 1234  # reproducible input
-python run.py --runs 100                        # batch, scenarios in rotation
+python run.py --runs 70                         # batch, scenarios in rotation (7 scenarios)
+python run.py --runs 70 --no-logs               # same, metrics only
 python run.py --runs 50 --scenario contradictory
 python run.py --runs 20 --verbose               # full detail for every run
 ```
 
-One Jev request is sent per run, so `--runs 100` makes 100 API calls.
+One Jev request is sent per run, so `--runs 70` makes 70 API calls. Use a multiple of 7 for equal runs per scenario.
 
 ### Reproduce a run with a seed
 
@@ -99,7 +120,7 @@ The seed fixes the **input**: the same scenario and seed always produce the same
 
 Each run writes to `results/` (git-ignored):
 
-- `<timestamp>-<N>runs.jsonl`: one JSON line per run: scenario, seed, observations, expected outcome, Jev's decision, per-field probabilities and confidence, latency, raw response, and match flags.
+- `<timestamp>-<N>runs.jsonl`: one JSON line per run: scenario, seed, observations and logs exactly as sent to Jev, expected outcome, Jev's decision, per-field probabilities and confidence, latency, raw response, and match flags.
 - `<timestamp>-<N>runs-summary.json`: the aggregate summary, with the base seed and model versions.
 
 The summary reports total, correct and incorrect runs, accuracy by decision type and by scenario, mean confidence (all, correct, incorrect) and latency (mean, p50, p95, max).
@@ -109,7 +130,7 @@ How to read it:
 - A run counts as correct only if **all three** fields match.
 - A reply outside the allowed values is `invalid` and counts as incorrect. It is never adjusted.
 - A failed API call is `errored`. It is shown but excluded from accuracy.
-- Confidence is the mean of Jev's confidence for severity and action. Jev gives no confidence for the yes/no question, only a probability of "yes". That probability is saved, and human review is `yes` when it is 0.5 or more. That threshold is our choice, not part of the Jev API.
+- Confidence is the mean of Jev's confidence for severity and action. The cause's own confidence is saved per run but not included. Jev gives no confidence for the yes/no question, only a probability of "yes". That probability is saved, and human review is `yes` when it is 0.5 or more. That threshold is our choice, not part of the Jev API.
 
 ## Tests
 
@@ -132,6 +153,7 @@ The image contains no credentials. Pass them at run time.
 
 - The data is synthetic, and the scenarios are simple. Good results here do not show fitness for real infrastructure.
 - Each scenario has a single expected answer. For ambiguous cases more than one answer may be reasonable.
+- Log lines come from a small set of templates. Real logs are much noisier and larger.
 - Results depend on the Jev model version and on how the questions are worded (`QUESTIONS` in `jev/client.py`).
 
 ## Layout
@@ -140,6 +162,7 @@ The image contains no credentials. Pass them at run time.
 run.py                    CLI and batch runner
 scenarios/definitions.py  scenarios, expected outcomes, rationale
 generator/server_state.py synthetic observations
+generator/app_logs.py     synthetic application logs
 jev/client.py             Jev adapter (the only Jev-specific code)
 evaluation/evaluator.py   comparison, aggregation, summary text
 tests/                    offline unit tests

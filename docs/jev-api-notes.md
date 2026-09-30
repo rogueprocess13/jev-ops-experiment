@@ -48,15 +48,16 @@ Pydantic AI page: 32k tokens per request. Not a concern for one small observatio
 
 ## Mapping for this project
 
-One request per run, three questions:
+One request per run, four questions:
 
 | Decision | Jev question type | Reading the answer |
 |---|---|---|
 | `severity` | `choice`: normal, degraded, high, critical | `choice`, `probabilities`, `confidence` |
 | `action` | `choice`: observe, investigate, restart, escalate | `choice`, `probabilities`, `confidence` |
+| `probable_cause` | `choice`: none, resource_exhaustion, dependency_failure, application_bug, configuration, network, unknown | `choice`, `probabilities`, `confidence`. Scored separately, not part of PASS/FAIL. |
 | `human_review` | `noul` | `noul` is P(yes). Decide `yes` if >= 0.5, else `no`. Record the raw probability. |
 
-Overall confidence for a run: the mean of the `severity` and `action` choice confidences. Per-field confidence, the raw noul probability, and full probability tables are stored too. Noul has no confidence value, so it is not folded into the overall figure. The 0.5 threshold is our choice, not part of the API.
+Overall confidence for a run: the mean of the `severity` and `action` choice confidences (not `probable_cause`). Per-field confidence, the raw noul probability, and full probability tables are stored too. Noul has no confidence value, so it is not folded into the overall figure. The 0.5 threshold is our choice, not part of the API.
 
 ## Configuration
 

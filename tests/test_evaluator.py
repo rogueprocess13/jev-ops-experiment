@@ -3,7 +3,7 @@ from evaluation.evaluator import aggregate, compare, format_summary, make_record
 from jev.client import Decision
 from scenarios.definitions import Expected
 
-EXP = Expected("high", "investigate", "no")
+EXP = Expected("high", "investigate", "no", "resource_exhaustion")
 
 
 def rec(scenario, decision, run=1):
@@ -11,8 +11,29 @@ def rec(scenario, decision, run=1):
 
 
 def test_full_match():
-    m = compare(EXP, ok_decision("high", "investigate", "no"))
-    assert m == {"severity": True, "action": True, "human_review": True, "overall": True}
+    m = compare(EXP, ok_decision("high", "investigate", "no", probable_cause="resource_exhaustion"))
+    assert m == {"severity": True, "action": True, "human_review": True,
+                 "probable_cause": True, "overall": True}
+
+
+def test_wrong_cause_does_not_fail_the_decision():
+    m = compare(EXP, ok_decision("high", "investigate", "no", probable_cause="network"))
+    assert m["overall"] is True and m["probable_cause"] is False
+
+
+def test_cause_accuracy_reported_separately():
+    good = ok_decision("high", "investigate", "no", probable_cause="resource_exhaustion")
+    wrong_cause = ok_decision("high", "investigate", "no", probable_cause="unknown")
+    s = aggregate([rec("a", good, 1), rec("a", wrong_cause, 2)])
+    assert s["correct"] == 2
+    assert s["by_field"]["probable_cause"] == {"correct": 1, "total": 2}
+    assert "not in PASS/FAIL" in format_summary(s)
+
+
+def test_old_records_without_cause_still_compare():
+    old = {"severity": "high", "action": "investigate", "human_review": "no"}
+    m = compare(old, ok_decision("high", "investigate", "no"))
+    assert m["overall"] is True and m["probable_cause"] is False
 
 
 def test_partial_match():

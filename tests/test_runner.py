@@ -14,11 +14,12 @@ def perfect_client(n):
 
 
 def test_plan_is_deterministic_and_balanced():
-    a = run.plan_runs(None, 100, 1000)
-    assert a == run.plan_runs(None, 100, 1000)
+    total = len(scenario_names()) * 20
+    a = run.plan_runs(None, total, 1000)
+    assert a == run.plan_runs(None, total, 1000)
     counts = {n: sum(1 for s, _ in a if s == n) for n in scenario_names()}
     assert set(counts.values()) == {20}
-    assert [seed for _, seed in a] == list(range(1000, 1100))
+    assert [seed for _, seed in a] == list(range(1000, 1000 + total))
 
 
 def test_named_and_random_plans():
@@ -89,3 +90,27 @@ def test_recommended_action_is_only_recorded(tmp_path):
     # Runner must never act on a 'restart' recommendation; it only stores it.
     recs, _ = run.run_experiment(FakeClient([ok_decision("critical", "restart", "yes")]), "critical", 1, 1, tmp_path, out=lambda *_: None)
     assert recs[0]["decision"]["action"] == "restart"
+
+
+def test_no_logs_withholds_logs_but_keeps_metrics(tmp_path):
+    fake = FakeClient([ok_decision()])
+    recs, _ = run.run_experiment(fake, "hung_worker", 2, 5, tmp_path, out=lambda *_: None,
+                                 include_logs=False)
+    assert all("logs" not in c for c in fake.calls)
+    full = generate("hung_worker", 5).to_dict()
+    full.pop("logs")
+    assert recs[0]["observations"] == full and recs[0]["include_logs"] is False
+    assert list(tmp_path.glob("*-nologs.jsonl"))
+
+
+def test_logs_sent_by_default_and_shown(tmp_path):
+    fake = FakeClient([ok_decision()])
+    lines = []
+    run.run_experiment(fake, "hung_worker", 1, 5, tmp_path, out=lines.append)
+    assert fake.calls[0]["logs"]
+    assert "Logs (last 15 min):" in "\n".join(lines) and "deadlock" in "\n".join(lines) \
+        or "watchdog" in "\n".join(lines)
+
+
+def test_no_logs_flag_parses():
+    assert run.parse_args(["--no-logs"]).no_logs is True

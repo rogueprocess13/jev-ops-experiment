@@ -68,8 +68,26 @@
 - [x] 9.3 Add minimal `Dockerfile` (slim Python, `ENTRYPOINT ["python", "run.py"]`, no baked credentials, add `.dockerignore` excluding `.env` and `results/`)
 - [ ] 9.4 Build and run the image once with env vars and a mounted results directory
 
-## 10. First experiment and wrap-up
+## 10. Application logs
 
-- [ ] 10.1 Run `python run.py --runs 100` against real Jev and keep the JSONL and summary locally
-- [ ] 10.2 Review ambiguous/contradictory results and note observations in the README or a `docs/` findings note (calculated from real output only)
-- [ ] 10.3 Update `PLAN.md` status to implemented and tag v0.1.0
+- [x] 10.1 Add a seeded application-log generator (`generator/app_logs.py`) with templates by kind, attributed to affected services
+- [x] 10.2 Add log specs to every scenario profile; contradictory logs conflict with metrics
+- [x] 10.3 Add `hung_worker` (expects restart) and `log_only_errors` (evidence only in logs) with rationale
+- [x] 10.4 Add `--no-logs` ablation: same metrics, logs withheld; record `include_logs`, `-nologs` file suffix, report states mode
+- [x] 10.5 Show logs in per-run output (level counts plus last 15 lines)
+- [x] 10.6 Tests: well-formed, deterministic, match severity, name affected service, no answer leakage, metrics unchanged by logs, ablation
+- [x] 10.7 Update README, CLAUDE.md, run-all default (70 runs = 10 per scenario)
+
+## 11. Probable cause
+
+- [x] 11.1 Add `CAUSES` and a required `probable_cause` to `Expected`; set and comment the expected cause for every scenario
+- [x] 11.2 Add a `probable_cause` choice question to the Jev adapter, validated like the others; keep overall confidence to severity and action
+- [x] 11.3 Score cause separately: in `by_field`, not in `overall`; tolerate old records without it
+- [x] 11.4 Show cause in per-run output, summary, report tables and misses
+- [x] 11.5 Tests: invalid cause rejected, wrong cause does not fail a decision, cause accuracy reported, old records compare
+
+## 12. First experiment and wrap-up
+
+- [ ] 12.1 Run `python run.py --runs 70` and `--runs 70 --no-logs` with the same seed against real Jev and keep the JSONL and summary locally
+- [ ] 12.2 Review ambiguous/contradictory results and note observations in the README or a `docs/` findings note (calculated from real output only)
+- [ ] 12.3 Update `PLAN.md` status to implemented and tag v0.1.0

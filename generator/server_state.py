@@ -8,6 +8,7 @@ from __future__ import annotations
 import random
 from dataclasses import asdict, dataclass, field
 
+from generator.app_logs import generate_logs
 from scenarios.definitions import Profile, Scenario, get_scenario
 
 SERVICE_NAMES = ("api", "worker", "database", "cache")
@@ -25,6 +26,7 @@ class ServerState:
     services: dict = field(default_factory=dict)  # name -> healthy|degraded|down
     restarts_last_hour: int = 0
     recent_events: list = field(default_factory=list)
+    logs: list = field(default_factory=list)  # application log lines, oldest first
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -44,7 +46,8 @@ def _stress(rng: random.Random, band: tuple[float, float], jitter: float) -> flo
 def _pick_services(rng: random.Random, profile: Profile) -> dict:
     n_down = rng.randint(*profile.services_down)
     n_degraded = rng.randint(*profile.services_degraded)
-    names = rng.sample(SERVICE_NAMES, min(len(SERVICE_NAMES), n_down + n_degraded))
+    pool = profile.affected or SERVICE_NAMES
+    names = rng.sample(pool, min(len(pool), n_down + n_degraded))
     status = {n: "healthy" for n in SERVICE_NAMES}
     for n in names[:n_down]:
         status[n] = "down"
@@ -81,6 +84,11 @@ def generate(scenario: Scenario | str, seed: int) -> ServerState:
     if restarts:
         events.append(f"{restarts} service restart(s) in the last hour")
 
+    # Services before logs, so the logs can name the affected services.
+    services = _pick_services(rng, profile)
+    affected = [n for n, st in services.items() if st != "healthy"]
+    logs = generate_logs(rng, profile.logs, affected, SERVICE_NAMES)
+
     return ServerState(
         cpu_pct=round(cpu, 1),
         memory_pct=round(mem, 1),
@@ -89,7 +97,8 @@ def generate(scenario: Scenario | str, seed: int) -> ServerState:
         network_errors_per_min=net,
         app_error_rate_pct=round(err, 2),
         api_latency_ms=latency,
-        services=_pick_services(rng, profile),
+        services=services,
         restarts_last_hour=restarts,
         recent_events=events,
+        logs=logs,
     )

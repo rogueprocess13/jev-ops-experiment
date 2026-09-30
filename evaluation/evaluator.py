@@ -6,7 +6,9 @@ from __future__ import annotations
 
 from statistics import mean
 
-FIELDS = ("severity", "action", "human_review")
+FIELDS = ("severity", "action", "human_review")  # the operational decision: PASS needs all three
+DIAGNOSIS_FIELDS = ("probable_cause",)  # scored, but not part of PASS/FAIL
+ALL_FIELDS = FIELDS + DIAGNOSIS_FIELDS
 
 
 def compare(expected, decision) -> dict:
@@ -14,7 +16,7 @@ def compare(expected, decision) -> dict:
     exp = expected.to_dict() if hasattr(expected, "to_dict") else dict(expected)
     dec = decision.to_dict() if hasattr(decision, "to_dict") else dict(decision)
     ok = dec.get("status") == "ok"
-    match = {f: bool(ok and dec.get(f) == exp[f]) for f in FIELDS}
+    match = {f: bool(ok and exp.get(f) is not None and dec.get(f) == exp[f]) for f in ALL_FIELDS}
     match["overall"] = all(match[f] for f in FIELDS)
     return match
 
@@ -56,8 +58,8 @@ def aggregate(records: list[dict]) -> dict:
     correct = [r for r in scored if r["match"]["overall"]]
 
     by_field = {}
-    for f in FIELDS:
-        c = sum(1 for r in scored if r["match"][f])
+    for f in ALL_FIELDS:
+        c = sum(1 for r in scored if r["match"].get(f))
         by_field[f] = {"correct": c, "total": len(scored)}
 
     by_scenario: dict[str, dict] = {}
@@ -117,7 +119,8 @@ def format_summary(s: dict) -> str:
 
     lines += ["", "By decision type", "----------------"]
     for f, v in s["by_field"].items():
-        lines.append(f"{f:<14} {v['correct']}/{v['total']}")
+        note = "  (diagnosis, not in PASS/FAIL)" if f in DIAGNOSIS_FIELDS else ""
+        lines.append(f"{f:<15} {v['correct']}/{v['total']}{note}")
 
     lines += ["", "By scenario", "-----------"]
     for name, v in s["by_scenario"].items():
