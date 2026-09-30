@@ -86,8 +86,25 @@
 - [x] 11.4 Show cause in per-run output, summary, report tables and misses
 - [x] 11.5 Tests: invalid cause rejected, wrong cause does not fail a decision, cause accuracy reported, old records compare
 
-## 12. First experiment and wrap-up
+## 12. Telemetry
 
-- [ ] 12.1 Run `python run.py --runs 70` and `--runs 70 --no-logs` with the same seed against real Jev and keep the JSONL and summary locally
-- [ ] 12.2 Review ambiguous/contradictory results and note observations in the README or a `docs/` findings note (calculated from real output only)
-- [ ] 12.3 Update `PLAN.md` status to implemented and tag v0.1.0
+- [x] 12.1 Capture per-run tokens, Jev `elapsedMs`, round trip, total time, attempts, HTTP status, payload sizes, raw usage
+- [x] 12.2 Cost: reported by Jev if present, else estimated from optional `JEV_PRICE_*` env prices, else n/a; source recorded
+- [x] 12.3 Aggregate telemetry (totals, means, percentiles, overhead, retries, status counts, per scenario) and show it in the summary, per-run output and report
+- [x] 12.4 Record batch meta: start/end, wall time, runs/min, git commit, Python, platform, Jev URL and model
+- [x] 12.5 Tests for capture, cost rules, retries, errors, aggregation, meta and report
+
+## 13. Easy checkout for other users
+
+- [x] 13.1 `./run-all.sh --check`: setup and tests with no key; Python >= 3.10 check; venv error hint; creates `.env`
+- [x] 13.2 Reject the placeholder key with a clear message
+- [x] 13.3 Pin dependencies; `.gitattributes` for LF shell scripts
+- [x] 13.4 CI: fresh-checkout `--check` on Python 3.10-3.13, plus Docker build
+- [x] 13.5 README quick start, manual and Windows setup, Docker with `--env-file`, troubleshooting
+- [x] 13.6 Verify from a fresh clone (local and in clean containers)
+
+## 14. First experiment and wrap-up
+
+- [ ] 14.1 Run `python run.py --runs 70` and `--runs 70 --no-logs` with the same seed against real Jev and keep the JSONL and summary locally
+- [ ] 14.2 Review ambiguous/contradictory results and note observations in the README or a `docs/` findings note (calculated from real output only)
+- [ ] 14.3 Update `PLAN.md` status to implemented and tag v0.1.0

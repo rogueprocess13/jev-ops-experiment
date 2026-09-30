@@ -120,3 +120,87 @@ def test_missing_key_raises_config_error(monkeypatch):
     monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: None)
     with pytest.raises(ConfigError, match="JEV_API_KEY"):
         jc.load_config()
+
+
+# --- telemetry ------------------------------------------------------------------
+
+def with_usage(extra_usage=None, elapsed=31):
+    b = body()
+    b["usage"] = {"input_tokens": 300, "output_tokens": 20, **(extra_usage or {})}
+    b["elapsedMs"] = elapsed
+    return b
+
+
+def make_priced(responses, price_in=None, price_out=None, retries=2):
+    c, calls = make(responses, retries)
+    c.config = JevConfig(api_key="SECRET-KEY", max_retries=retries,
+                         price_input_per_mtok=price_in, price_output_per_mtok=price_out)
+    return c, calls
+
+
+def test_tokens_and_server_time_captured():
+    c, _ = make([Resp(200, with_usage())])
+    d = c.decide({})
+    assert (d.input_tokens, d.output_tokens, d.server_elapsed_ms) == (300, 20, 31)
+    assert d.attempts == 1 and d.http_status == 200 and d.request_bytes > 0
+    assert d.total_ms >= d.latency_ms >= 0
+
+
+def test_no_price_no_reported_cost_means_no_cost():
+    c, _ = make([Resp(200, with_usage())])
+    d = c.decide({})
+    assert d.cost_usd is None and d.cost_source is None
+
+
+def test_cost_estimated_from_user_prices():
+    c, _ = make_priced([Resp(200, with_usage())], price_in=1.0, price_out=4.0)
+    d = c.decide({})
+    assert d.cost_usd == pytest.approx((300 * 1.0 + 20 * 4.0) / 1_000_000)
+    assert d.cost_source == "estimated"
+
+
+def test_reported_cost_wins_over_estimate():
+    c, _ = make_priced([Resp(200, with_usage({"cost_usd": 0.0002}))], price_in=1.0, price_out=4.0)
+    d = c.decide({})
+    assert d.cost_usd == 0.0002 and d.cost_source == "reported:usage.cost_usd"
+
+
+def test_retries_counted_in_telemetry():
+    c, _ = make([Resp(429), Resp(200, with_usage())])
+    d = c.decide({})
+    assert d.attempts == 2 and d.http_status == 200
+
+
+def test_error_result_carries_telemetry():
+    c, _ = make([requests.ConnectionError("x")] * 3)
+    d = c.decide({})
+    assert d.status == "error" and d.attempts == 3 and d.total_ms is not None
+
+
+def test_tokens_kept_for_invalid_answer():
+    b = with_usage()
+    b["answers"]["severity"]["choice"] = "catastrophic"
+    c, _ = make([Resp(200, b)])
+    d = c.decide({})
+    assert d.status == "invalid" and d.input_tokens == 300
+
+
+def test_bad_price_env_is_config_error(monkeypatch):
+    monkeypatch.setenv("JEV_API_KEY", "k")
+    monkeypatch.setenv("JEV_PRICE_INPUT_PER_MTOK", "cheap")
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: None)
+    with pytest.raises(ConfigError, match="JEV_PRICE_INPUT_PER_MTOK"):
+        jc.load_config()
+
+
+def test_placeholder_key_rejected(monkeypatch):
+    monkeypatch.setenv("JEV_API_KEY", "your-key-here")
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: None)
+    with pytest.raises(ConfigError, match="placeholder"):
+        jc.load_config()
+
+
+def test_env_example_uses_the_placeholder():
+    from pathlib import Path
+    text = (Path(__file__).resolve().parent.parent / ".env.example").read_text()
+    assert f"JEV_API_KEY={jc.PLACEHOLDER_KEY}" in text

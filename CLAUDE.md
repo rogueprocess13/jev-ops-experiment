@@ -12,6 +12,7 @@ Experimental benchmark: can Jev AI make bounded operational decisions (severity,
 - **Tests never assert what real Jev answers.** Jev's output is what the experiment measures. Use `FakeClient` from `tests/helpers.py` or canned HTTP responses. Tests must pass offline with no API key.
 - **Jev sees only the observations.** Never put the scenario name, expected outcome, or any hint in the request (`test_request_does_not_contain_scenario_or_expected` guards this).
 - **PASS/FAIL is the operational decision only** (severity, action, human review). `probable_cause` is a diagnosis, scored separately (`DIAGNOSIS_FIELDS` in `evaluation/evaluator.py`). Do not fold it into `overall`.
+- **Never invent cost.** Use a cost Jev reports, or estimate from user-set `JEV_PRICE_*` prices, else `n/a`. Do not add a default price: Jev publishes none.
 - **Do not coerce or guess.** An out-of-set Jev reply is `invalid` and counts as incorrect. A failed call is `error` and is excluded from accuracy.
 - **Never hard-code or invent results.** Every reported figure is computed from the run records.
 - **All randomness comes from `random.Random(seed)`** inside the generator. Never use the global RNG. Logs are generated *after* metrics and services, so adding log kinds never changes a seed's metrics. Keep it that way.
@@ -58,6 +59,15 @@ openspec/                  proposal, design, specs, tasks for the project
 - `results/*` is git-ignored except `.gitkeep`. Do not commit result files unless deliberately publishing a sample run, and label it as such.
 - Commit messages end with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
+## Keep it easy to check out
+
+Other people clone this repo and run it. Keep these working:
+
+- `./run-all.sh --check` on a fresh clone sets up everything and passes with no key and no network access to Jev. CI runs exactly this on Python 3.10-3.13 (`.github/workflows/tests.yml`).
+- New dependencies go in `requirements.txt`, pinned.
+- New environment variables go in `.env.example` and the README table.
+- Keep code compatible with Python 3.10.
+
 ## Status
 
-Tasks 1-9 are implemented and tested offline. Still open: the real-Jev smoke test and the 100-run experiment (need an API key), then marking `PLAN.md` implemented and tagging v0.1.0.
+Everything except the live runs is implemented and tested offline. Still open: the first real-Jev run (needs an API key), then marking `PLAN.md` implemented and tagging v0.1.0.

@@ -1,3 +1,4 @@
-requests>=2.31
-python-dotenv>=1.0
-pytest>=8.0
+# Pinned to the versions the project is tested with (Python 3.10-3.13).
+requests==2.34.2
+python-dotenv==1.2.3
+pytest==9.1.1

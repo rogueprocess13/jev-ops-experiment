@@ -28,6 +28,10 @@ def latest(results_dir: Path) -> Path:
     return files[-1]
 
 
+def _n(x) -> str:
+    return "n/a" if x is None else f"{x:,.0f}"
+
+
 def choices(records: list[dict], field: str) -> str:
     c = Counter(r["decision"].get(field) or r["status"] for r in records)
     return ", ".join(f"{k} x{v}" for k, v in c.most_common())
@@ -48,6 +52,15 @@ def render(records: list[dict], source: str) -> str:
                 "| Field | Expected | Jev returned |", "|---|---|---|"]
         out += [f"| {f} | {exp.get(f, 'n/a')} | {choices(rs, f)} |" for f in ALL_FIELDS]
         out.append("")
+
+    out += ["## Telemetry by scenario", "",
+            "| Scenario | Log lines | Tokens in | Tokens out | Round trip (ms) | Cost/run (USD) |",
+            "|---|---|---|---|---|---|"]
+    for name, t in s["telemetry"]["by_scenario"].items():
+        cost = "n/a" if t["mean_cost_usd"] is None else f"{t['mean_cost_usd']:.6f}"
+        out.append(f"| {name} | {_n(t['mean_log_lines'])} | {_n(t['mean_input_tokens'])} | "
+                   f"{_n(t['mean_output_tokens'])} | {_n(t['mean_latency_ms'])} | {cost} |")
+    out += ["", "Means per run. Compare with a `--no-logs` report to see what the logs cost in tokens.", ""]
 
     bad = [r for r in records if r["status"] != "ok" or not r["match"]["overall"]]
     out += [f"## Misses ({len(bad)})", "", "A miss is a wrong operational decision. Cause is shown but does not decide PASS/FAIL.", ""]

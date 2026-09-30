@@ -6,6 +6,33 @@ This project tests whether Jev AI can make bounded operational decisions from sy
 
 Prepared for discussion in the LF Edge AIOps forum.
 
+[![tests](https://github.com/rogueprocess13/jev-ops-experiment/actions/workflows/tests.yml/badge.svg)](https://github.com/rogueprocess13/jev-ops-experiment/actions/workflows/tests.yml)
+
+## Quick start
+
+You need Python 3.10 or newer and git. Linux and macOS work as shown. On Windows, use WSL or see [Manual setup](#manual-setup).
+
+```bash
+git clone https://github.com/rogueprocess13/jev-ops-experiment.git
+cd jev-ops-experiment
+./run-all.sh --check      # sets up .venv, installs, runs the tests. No key, no API calls.
+```
+
+Then get a Jev API key at <https://thejevai.com/settings/apikeys>, put it in `.env` (the check created it for you):
+
+```bash
+JEV_API_KEY=your-real-key
+```
+
+and run:
+
+```bash
+./run-all.sh 7            # one run per scenario: 7 API calls
+./run-all.sh              # the full 70-run batch
+```
+
+The report is printed at the end and saved in `results/`.
+
 ## How it works
 
 ```
@@ -57,17 +84,38 @@ Without logs, Jev cannot see the evidence for `hung_worker` and `log_only_errors
 
 ## Prerequisites
 
-- Python 3.10 or newer (developed on 3.13)
-- A Jev API key from <https://thejevai.com/settings/apikeys>
+- Python 3.10 or newer (CI tests 3.10, 3.11, 3.12 and 3.13)
+- A Jev API key from <https://thejevai.com/settings/apikeys>. Not needed for `./run-all.sh --check` or the tests.
+- Optional: Docker
 
-## Install
+## Manual setup
+
+`./run-all.sh` does all of this for you. Do it by hand if you prefer, or on Windows without WSL.
+
+Linux and macOS:
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env      # then edit .env and set JEV_API_KEY
+pytest                    # optional: offline tests
+python run.py --runs 7
+python report.py
 ```
+
+Windows (PowerShell):
+
+```powershell
+py -3 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env    # then edit .env and set JEV_API_KEY
+python run.py --runs 7
+python report.py
+```
+
+Dependencies are pinned in `requirements.txt` to the tested versions.
 
 ### Environment variables
 
@@ -78,6 +126,8 @@ cp .env.example .env      # then edit .env and set JEV_API_KEY
 | `JEV_MODEL` | no | `jev-latest` |
 | `JEV_TIMEOUT_S` | no | `30` |
 | `JEV_MAX_RETRIES` | no | `3` |
+| `JEV_PRICE_INPUT_PER_MTOK` | no | none (USD per million input tokens, to estimate cost) |
+| `JEV_PRICE_OUTPUT_PER_MTOK` | no | none (USD per million output tokens) |
 
 `.env` is git-ignored. Never commit a key.
 
@@ -123,7 +173,31 @@ Each run writes to `results/` (git-ignored):
 - `<timestamp>-<N>runs.jsonl`: one JSON line per run: scenario, seed, observations and logs exactly as sent to Jev, expected outcome, Jev's decision, per-field probabilities and confidence, latency, raw response, and match flags.
 - `<timestamp>-<N>runs-summary.json`: the aggregate summary, with the base seed and model versions.
 
-The summary reports total, correct and incorrect runs, accuracy by decision type and by scenario, mean confidence (all, correct, incorrect) and latency (mean, p50, p95, max).
+The summary reports total, correct and incorrect runs, accuracy by decision type and by scenario, mean confidence (all, correct, incorrect), and telemetry (see below).
+
+### Telemetry
+
+Every run records:
+
+| Field | Meaning |
+|---|---|
+| `input_tokens`, `output_tokens` | from Jev's `usage` object |
+| `cost_usd`, `cost_source` | see below |
+| `latency_ms` | round trip of the request that answered |
+| `server_elapsed_ms` | Jev's own `elapsedMs` (includes validation, not pure inference) |
+| `total_ms` | the whole call, including retries and backoff |
+| `attempts`, `http_status` | retries and the final status |
+| `request_bytes`, `response_bytes` | payload sizes |
+| `log_lines_sent` | how many log lines Jev saw (0 with `--no-logs`) |
+| `usage` | Jev's raw usage object, whatever it contains |
+
+The batch summary adds token totals and means, total and per-run cost, round-trip, Jev-elapsed and overhead percentiles, attempts, retries and HTTP status counts. The report has a per-scenario telemetry table, so a `--no-logs` report shows what the logs cost in tokens. The summary file also records start and end time, wall time, runs per minute, git commit, Python version, platform, and the Jev URL and model requested.
+
+**Cost is never invented.** Jev sells credit packs and publishes no per-token price, and its docs say only that usage "may include cost in USD". So:
+
+1. If the response's `usage` has a numeric cost field, that is used, marked `reported:usage.<field>`.
+2. Otherwise, if you set `JEV_PRICE_INPUT_PER_MTOK` and `JEV_PRICE_OUTPUT_PER_MTOK`, cost is estimated from tokens, marked `estimated`.
+3. Otherwise cost is `n/a`.
 
 How to read it:
 
@@ -142,12 +216,28 @@ The tests need no network and no API key. They cover scenario definitions, gener
 
 ## Docker (optional)
 
+No Python needed on your machine:
+
 ```bash
 docker build -t jev-ops-experiment .
-docker run --rm -e JEV_API_KEY=... -v "$PWD/results:/app/results" jev-ops-experiment --runs 20
+cp .env.example .env      # then set JEV_API_KEY
+docker run --rm --env-file .env -v "$PWD/results:/app/results" jev-ops-experiment --runs 7
+docker run --rm -v "$PWD/results:/app/results" --entrypoint python jev-ops-experiment report.py
 ```
 
-The image contains no credentials. Pass them at run time.
+The image contains no credentials; `.env` is excluded from the build. Pass them at run time with `--env-file` or `-e JEV_API_KEY=...`.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `Python 3.10 or newer is required` | Install a newer Python, or point the script at one: `PYTHON=/usr/bin/python3.12 ./run-all.sh --check` |
+| `could not create a virtual environment` | Debian/Ubuntu: `sudo apt install python3-venv` |
+| `JEV_API_KEY is not set` / `still the placeholder` | Put your real key in `.env` |
+| `ERROR ... HTTP 401` in the results | The key is wrong or revoked |
+| `HTTP 429` / `529` | Rate limited or overloaded. The client retries with backoff; lower `--runs` or try later |
+| `./run-all.sh: Permission denied` | `chmod +x run-all.sh`, or run `bash run-all.sh` |
+| Broken venv after moving the folder | `rm -rf .venv` and run `./run-all.sh --check` again |
 
 ## Limitations
 

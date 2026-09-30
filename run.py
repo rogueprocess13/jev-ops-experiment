@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import random
+import subprocess
 import sys
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from evaluation.evaluator import FIELDS, aggregate, format_summary, make_record
@@ -55,6 +58,29 @@ def format_logs(logs, included: bool) -> list[str]:
     if len(logs) > MAX_LOG_LINES:
         lines.append(f"... {len(logs) - MAX_LOG_LINES} older lines not shown (all were sent to Jev)")
     return lines
+
+
+def _n(x, spec=",.0f", unit=""):
+    return "n/a" if x is None else f"{x:{spec}}{unit}"
+
+
+def format_run_telemetry(d: dict) -> list[str]:
+    cost = "n/a" if d.get("cost_usd") is None else f"${d['cost_usd']:.6f} ({d['cost_source']})"
+    return [
+        f"Tokens:       {_n(d.get('input_tokens'))} in / {_n(d.get('output_tokens'))} out",
+        f"Cost:         {cost}",
+        f"Round trip:   {_n(d.get('latency_ms'), '.0f', ' ms')}  (Jev elapsed {_n(d.get('server_elapsed_ms'), '.0f', ' ms')})",
+        f"Total:        {_n(d.get('total_ms'), '.0f', ' ms')}  in {d.get('attempts', 0)} attempt(s), HTTP {d.get('http_status') or 'n/a'}",
+        f"Request:      {_n(d.get('request_bytes'))} bytes",
+    ]
+
+
+def _git_commit() -> str | None:
+    try:
+        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
+                              text=True, timeout=5, cwd=Path(__file__).parent).stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
 
 
 def format_run(record: dict) -> str:
@@ -105,7 +131,7 @@ def format_run(record: dict) -> str:
     else:
         wrong = [f for f in FIELDS if not record["match"][f]]
         result = "FAIL (" + ", ".join(wrong) + ")"
-    lines += ["", f"Result: {result}"]
+    lines += ["", "Telemetry", "---------", *format_run_telemetry(d), "", f"Result: {result}"]
     if d["status"] == "ok" and "probable_cause" in record["match"]:
         verdict = "correct" if record["match"]["probable_cause"] else "incorrect"
         lines.append(f"Cause:  {verdict} (scored separately)")
@@ -116,6 +142,8 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
                    include_logs=True):
     verbose = (runs == 1) if verbose is None else verbose
     records = []
+    started_at = datetime.now(timezone.utc)
+    t_start = time.perf_counter()
     for i, (name, seed) in enumerate(plan_runs(scenario_arg, runs, base_seed), 1):
         scenario = get_scenario(name)
         obs = generate(scenario, seed).to_dict()
@@ -124,12 +152,17 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
         decision = client.decide(obs)
         rec = make_record(i, name, seed, obs, scenario.expected, decision)
         rec["include_logs"] = include_logs
+        rec["log_lines_sent"] = len(obs.get("logs", []))
+        rec["started_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
         records.append(rec)
         if verbose:
             out(format_run(rec))
         else:
             tag = "ERROR" if rec["status"] == "error" else ("PASS" if rec["match"]["overall"] else "FAIL")
-            out(f"[{i}/{runs}] {name:<13} seed={seed:<8} {tag}")
+            toks = decision.to_dict().get("input_tokens")
+            out(f"[{i}/{runs}] {name:<15} seed={seed:<8} {tag:<5} "
+                f"{_n(decision.to_dict().get('latency_ms'), '.0f', ' ms'):>8}  {_n(toks)} tok")
+    wall_s = time.perf_counter() - t_start
     summary = aggregate(records)
 
     out_dir = Path(out_dir)
@@ -141,6 +174,15 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
             fh.write(json.dumps(r) + "\n")
     meta = {"base_seed": base_seed, "scenario_arg": scenario_arg, "runs": runs,
             "include_logs": include_logs,
+            "started_at": started_at.isoformat(timespec="seconds"),
+            "finished_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "wall_time_s": round(wall_s, 3),
+            "runs_per_min": round(runs / wall_s * 60, 1) if wall_s > 0 else None,
+            "git_commit": _git_commit(),
+            "python": platform.python_version(),
+            "platform": platform.platform(),
+            "jev_url": getattr(getattr(client, "config", None), "url", None),
+            "jev_model_requested": getattr(getattr(client, "config", None), "model", None),
             "models": sorted({r["decision"].get("model_version") for r in records
                               if r["decision"].get("model_version")})}
     with open(f"{base}-summary.json", "w") as fh:
@@ -148,6 +190,7 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
     if runs > 1:
         out("")
         out(format_summary(summary))
+    out(f"\nWall time: {wall_s:.1f} s ({meta['runs_per_min']} runs/min)")
     out(f"\nResults: {base}.jsonl")
     return records, summary
 

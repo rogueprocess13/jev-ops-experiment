@@ -9,6 +9,7 @@ One request per decision, three typed questions:
 """
 from __future__ import annotations
 
+import json
 import os
 import time
 from dataclasses import dataclass, field
@@ -20,6 +21,7 @@ from scenarios.definitions import ACTIONS, CAUSES, HUMAN_REVIEW, SEVERITIES
 
 DEFAULT_URL = "https://thejevai.com/v1/systemone"
 DEFAULT_MODEL = "jev-latest"
+PLACEHOLDER_KEY = "your-key-here"  # the value in .env.example
 HUMAN_REVIEW_THRESHOLD = 0.5
 RETRY_STATUSES = {429, 500, 502, 503, 504, 529}
 
@@ -83,6 +85,10 @@ class JevConfig:
     model: str = DEFAULT_MODEL
     timeout_s: float = 30.0
     max_retries: int = 3
+    # Optional, user-supplied USD prices per million tokens. Jev publishes no
+    # per-token rate (only credit packs), so there is no default.
+    price_input_per_mtok: float | None = None
+    price_output_per_mtok: float | None = None
 
 
 def load_config() -> JevConfig:
@@ -95,7 +101,13 @@ def load_config() -> JevConfig:
     key = os.environ.get("JEV_API_KEY", "").strip()
     if not key:
         raise ConfigError(
-            "JEV_API_KEY is not set. Copy .env.example to .env and add your key."
+            "JEV_API_KEY is not set. Copy .env.example to .env and add your key "
+            "(get one at https://thejevai.com/settings/apikeys)."
+        )
+    if key == PLACEHOLDER_KEY:
+        raise ConfigError(
+            "JEV_API_KEY in .env is still the placeholder. Get a key at "
+            "https://thejevai.com/settings/apikeys"
         )
     return JevConfig(
         api_key=key,
@@ -103,7 +115,19 @@ def load_config() -> JevConfig:
         model=os.environ.get("JEV_MODEL", DEFAULT_MODEL),
         timeout_s=float(os.environ.get("JEV_TIMEOUT_S", "30")),
         max_retries=int(os.environ.get("JEV_MAX_RETRIES", "3")),
+        price_input_per_mtok=_env_float("JEV_PRICE_INPUT_PER_MTOK"),
+        price_output_per_mtok=_env_float("JEV_PRICE_OUTPUT_PER_MTOK"),
     )
+
+
+def _env_float(name: str) -> float | None:
+    v = os.environ.get(name, "").strip()
+    if not v:
+        return None
+    try:
+        return float(v)
+    except ValueError:
+        raise ConfigError(f"{name} must be a number (USD per million tokens), got {v!r}") from None
 
 
 @dataclass
@@ -117,7 +141,19 @@ class Decision:
     field_confidence: dict = field(default_factory=dict)
     human_review_probability: float | None = None
     probabilities: dict = field(default_factory=dict)
-    latency_ms: float | None = None
+    latency_ms: float | None = None  # round trip of the answering attempt
+    # Telemetry
+    total_ms: float | None = None  # whole decide() call, incl. retries and backoff
+    server_elapsed_ms: float | None = None  # Jev's own elapsedMs
+    attempts: int = 0
+    http_status: int | None = None
+    request_bytes: int | None = None
+    response_bytes: int | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    usage: dict | None = None  # raw usage object, kept whatever it contains
+    cost_usd: float | None = None
+    cost_source: str | None = None  # reported:usage.<key> | estimated | None
     model_version: str | None = None
     raw_response: dict | None = None
     message: str = ""
@@ -165,6 +201,37 @@ def parse_response(body: dict) -> Decision:
     return out
 
 
+def _int(x) -> int | None:
+    return int(x) if isinstance(x, (int, float)) and not isinstance(x, bool) else None
+
+
+def apply_usage(d: Decision, body, cfg: JevConfig) -> None:
+    """Copy token, timing and cost telemetry from a response body onto a decision.
+
+    Cost: the docs say usage "may include cost in USD" without naming the
+    field, so a numeric usage key containing "cost" is used as reported cost.
+    Otherwise cost is estimated only if the user set prices. Never invented.
+    """
+    if not isinstance(body, dict):
+        return
+    usage = body.get("usage") if isinstance(body.get("usage"), dict) else None
+    d.usage = usage
+    elapsed = body.get("elapsedMs", (usage or {}).get("elapsedMs"))
+    d.server_elapsed_ms = _num(elapsed)
+    if usage:
+        d.input_tokens = _int(usage.get("input_tokens"))
+        d.output_tokens = _int(usage.get("output_tokens"))
+        for key in sorted(usage):
+            if "cost" in key.lower() and _num(usage[key]) is not None:
+                d.cost_usd, d.cost_source = _num(usage[key]), f"reported:usage.{key}"
+                return
+    if (cfg.price_input_per_mtok is not None and cfg.price_output_per_mtok is not None
+            and d.input_tokens is not None and d.output_tokens is not None):
+        d.cost_usd = (d.input_tokens * cfg.price_input_per_mtok
+                      + d.output_tokens * cfg.price_output_per_mtok) / 1_000_000
+        d.cost_source = "estimated"
+
+
 PostFn = Callable[[str, dict, dict, float], "requests.Response"]
 
 
@@ -190,29 +257,43 @@ class JevClient:
         cfg = self.config
         headers = {"Authorization": f"Bearer {cfg.api_key}", "Content-Type": "application/json"}
         payload = self.build_request(observations)
-        last = "no attempt made"
+        request_bytes = len(json.dumps(payload).encode())
+        started = time.perf_counter()
+        last, status, attempts = "no attempt made", None, 0
+
+        def done(d: Decision, latency=None, resp=None) -> Decision:
+            d.attempts, d.http_status, d.request_bytes = attempts, status, request_bytes
+            d.total_ms = (time.perf_counter() - started) * 1000
+            if latency is not None:
+                d.latency_ms = latency
+            if resp is not None:
+                d.response_bytes = len((resp.text or "").encode())
+            return d
+
         for attempt in range(cfg.max_retries + 1):
             if attempt:
                 self._sleep(min(2 ** (attempt - 1), 30))
+            attempts += 1
             t0 = time.perf_counter()
             try:
                 resp = self._post(cfg.url, headers, payload, cfg.timeout_s)
             except requests.RequestException as e:
-                last = f"{type(e).__name__}"
+                last, status = f"{type(e).__name__}", None
                 continue
             latency = (time.perf_counter() - t0) * 1000
-            if resp.status_code in RETRY_STATUSES:
-                last = f"HTTP {resp.status_code}"
+            status = resp.status_code
+            if status in RETRY_STATUSES:
+                last = f"HTTP {status}"
                 continue
-            if resp.status_code != 200:
-                return Decision(status=STATUS_ERROR, latency_ms=latency,
-                                message=f"HTTP {resp.status_code}: {resp.text[:200]}")
+            if status != 200:
+                return done(Decision(status=STATUS_ERROR, message=f"HTTP {status}: {resp.text[:200]}"),
+                            latency, resp)
             try:
                 body = resp.json()
             except ValueError:
-                return Decision(status=STATUS_INVALID, latency_ms=latency,
-                                message="response body is not JSON")
+                return done(Decision(status=STATUS_INVALID, message="response body is not JSON"),
+                            latency, resp)
             d = parse_response(body)
-            d.latency_ms = latency
-            return d
-        return Decision(status=STATUS_ERROR, message=f"gave up after retries: {last}")
+            apply_usage(d, body, cfg)  # tokens are billed even for an invalid answer
+            return done(d, latency, resp)
+        return done(Decision(status=STATUS_ERROR, message=f"gave up after retries: {last}"))

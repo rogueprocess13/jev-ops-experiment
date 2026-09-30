@@ -35,3 +35,9 @@ def test_no_results_is_a_clear_error(tmp_path):
     import pytest
     with pytest.raises(SystemExit, match="Run run.py first"):
         report.latest(tmp_path)
+
+
+def test_report_has_telemetry_table(tmp_path):
+    path = make_results(tmp_path)
+    text = report.render(report.load(path), path.name)
+    assert "## Telemetry by scenario" in text and "Tokens in" in text

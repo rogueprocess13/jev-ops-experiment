@@ -1,3 +1,4 @@
+import pytest
 from tests.helpers import ok_decision
 from evaluation.evaluator import aggregate, compare, format_summary, make_record
 from jev.client import Decision
@@ -96,3 +97,26 @@ def test_latency_stats():
 def test_summary_layout():
     out = format_summary(aggregate([rec("a", ok_decision("high", "investigate", "no"))]))
     assert "Overall" in out and "By scenario" in out and "a " in out
+
+
+def test_telemetry_aggregation():
+    d1 = ok_decision("high", "investigate", "no", input_tokens=300, output_tokens=20,
+                     cost_usd=0.001, server_elapsed_ms=30, latency=100)
+    d2 = ok_decision("high", "investigate", "no", input_tokens=500, output_tokens=30,
+                     cost_usd=0.003, server_elapsed_ms=50, latency=200, attempts=2)
+    t = aggregate([rec("a", d1, 1), rec("b", d2, 2)])["telemetry"]
+    assert t["input_tokens"]["total"] == 800 and t["input_tokens"]["mean"] == 400
+    assert t["output_tokens"]["total"] == 50
+    assert t["cost_usd"]["total"] == pytest.approx(0.004) and t["cost_usd"]["runs_with_cost"] == 2
+    assert t["overhead_ms"]["mean"] == 110  # (70 + 150) / 2
+    assert t["attempts"] == 3 and t["runs_retried"] == 1
+    assert t["http_status"] == {"200": 2}
+    assert t["by_scenario"]["b"]["mean_input_tokens"] == 500
+
+
+def test_telemetry_without_usage_is_na():
+    s = aggregate([rec("a", ok_decision("high", "investigate", "no"))])
+    assert s["telemetry"]["input_tokens"]["total"] is None
+    assert s["telemetry"]["cost_usd"]["total"] is None
+    text = format_summary(s)
+    assert "Telemetry" in text and "Cost:          n/a" in text

@@ -114,3 +114,28 @@ def test_logs_sent_by_default_and_shown(tmp_path):
 
 def test_no_logs_flag_parses():
     assert run.parse_args(["--no-logs"]).no_logs is True
+
+
+def test_meta_and_record_telemetry(tmp_path):
+    fake = FakeClient([ok_decision(input_tokens=321, output_tokens=21)])
+    recs, _ = run.run_experiment(fake, "critical", 2, 3, tmp_path, out=lambda *_: None)
+    assert recs[0]["log_lines_sent"] == len(generate("critical", 3).logs)
+    assert recs[0]["started_at"]
+    meta = json.loads(next(tmp_path.glob("*-summary.json")).read_text())["meta"]
+    for k in ("started_at", "finished_at", "wall_time_s", "runs_per_min", "python", "git_commit"):
+        assert k in meta
+    assert "api_key" not in json.dumps(meta).lower()
+
+
+def test_no_logs_records_zero_log_lines(tmp_path):
+    recs, _ = run.run_experiment(FakeClient([ok_decision()]), "critical", 1, 3, tmp_path,
+                                 out=lambda *_: None, include_logs=False)
+    assert recs[0]["log_lines_sent"] == 0
+
+
+def test_single_run_shows_telemetry(tmp_path):
+    lines = []
+    run.run_experiment(FakeClient([ok_decision(input_tokens=321, output_tokens=21)]), "healthy", 1, 1,
+                       tmp_path, out=lines.append)
+    text = "\n".join(lines)
+    assert "Telemetry" in text and "321 in / 21 out" in text and "Wall time:" in text

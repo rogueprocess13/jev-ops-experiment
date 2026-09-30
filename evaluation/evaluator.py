@@ -4,6 +4,7 @@ Pure functions over plain data. Every figure is computed from the records.
 """
 from __future__ import annotations
 
+from collections import Counter
 from statistics import mean
 
 FIELDS = ("severity", "action", "human_review")  # the operational decision: PASS needs all three
@@ -48,6 +49,52 @@ def _pct(xs, p):
     k = (len(xs) - 1) * p
     lo, hi = int(k), min(int(k) + 1, len(xs) - 1)
     return xs[lo] + (xs[hi] - xs[lo]) * (k - lo)
+
+
+def _stats(xs) -> dict:
+    xs = [x for x in xs if x is not None]
+    return {"n": len(xs), "total": sum(xs) if xs else None, "mean": _mean(xs),
+            "p50": _pct(xs, 0.5), "p95": _pct(xs, 0.95), "max": max(xs) if xs else None}
+
+
+def telemetry(records: list[dict]) -> dict:
+    """Tokens, cost, timing and transport figures. Covers every record, errors included."""
+    ds = [r["decision"] for r in records]
+    costs = [d.get("cost_usd") for d in ds if d.get("cost_usd") is not None]
+    rt = [d.get("latency_ms") for d in ds]
+    server = [d.get("server_elapsed_ms") for d in ds]
+    overhead = [a - b for a, b in zip(rt, server) if a is not None and b is not None]
+
+    by_scenario: dict[str, dict] = {}
+    for name in dict.fromkeys(r["scenario"] for r in records):
+        sd = [r["decision"] for r in records if r["scenario"] == name]
+        by_scenario[name] = {
+            "mean_input_tokens": _mean(d["input_tokens"] for d in sd if d.get("input_tokens") is not None),
+            "mean_output_tokens": _mean(d["output_tokens"] for d in sd if d.get("output_tokens") is not None),
+            "mean_latency_ms": _mean(d["latency_ms"] for d in sd if d.get("latency_ms") is not None),
+            "mean_cost_usd": _mean(d["cost_usd"] for d in sd if d.get("cost_usd") is not None),
+            "mean_log_lines": _mean(r.get("log_lines_sent", 0) for r in records if r["scenario"] == name),
+        }
+
+    return {
+        "input_tokens": _stats(d.get("input_tokens") for d in ds),
+        "output_tokens": _stats(d.get("output_tokens") for d in ds),
+        "cost_usd": {
+            "total": sum(costs) if costs else None,
+            "mean_per_run": _mean(costs),
+            "runs_with_cost": len(costs),
+            "sources": dict(Counter(d["cost_source"] for d in ds if d.get("cost_source"))),
+        },
+        "round_trip_ms": _stats(rt),
+        "server_elapsed_ms": _stats(server),
+        "overhead_ms": _stats(overhead),  # round trip minus Jev's elapsedMs
+        "total_ms": _stats(d.get("total_ms") for d in ds),
+        "attempts": sum(d.get("attempts") or 0 for d in ds),
+        "runs_retried": sum(1 for d in ds if (d.get("attempts") or 0) > 1),
+        "http_status": dict(Counter(str(d.get("http_status")) for d in ds)),
+        "request_bytes": _stats(d.get("request_bytes") for d in ds),
+        "by_scenario": by_scenario,
+    }
 
 
 def aggregate(records: list[dict]) -> dict:
@@ -99,6 +146,7 @@ def aggregate(records: list[dict]) -> dict:
             "p95": _pct(latencies, 0.95),
             "max": max(latencies) if latencies else None,
         },
+        "telemetry": telemetry(records),
     }
 
 
@@ -125,15 +173,42 @@ def format_summary(s: dict) -> str:
     lines += ["", "By scenario", "-----------"]
     for name, v in s["by_scenario"].items():
         extra = f"  ({v['errored']} errored)" if v["errored"] else ""
-        lines.append(f"{name:<14} {v['correct']}/{v['total']}{extra}")
+        lines.append(f"{name:<16} {v['correct']}/{v['total']}{extra}")
 
     c, lat = s["confidence"], s["latency_ms"]
     lines += ["", "Confidence (mean of severity and action confidence)", "----------",
               f"All:           {_fmt(c['mean'])}",
               f"Correct:       {_fmt(c['mean_correct'])}",
               f"Incorrect:     {_fmt(c['mean_incorrect'])}",
-              "", "Latency", "-------",
-              f"Mean:          {_fmt(lat['mean'], '.0f', ' ms')}",
-              f"p50 / p95:     {_fmt(lat['p50'], '.0f')} / {_fmt(lat['p95'], '.0f', ' ms')}",
-              f"Max:           {_fmt(lat['max'], '.0f', ' ms')}"]
+              "", *format_telemetry(s["telemetry"], s["runs"])]
     return "\n".join(lines)
+
+
+def _int_fmt(x) -> str:
+    return "n/a" if x is None else f"{x:,.0f}"
+
+
+def format_cost(c: dict) -> str:
+    if c["total"] is None:
+        return "n/a (no cost reported; set JEV_PRICE_INPUT_PER_MTOK and JEV_PRICE_OUTPUT_PER_MTOK to estimate)"
+    src = ", ".join(f"{k} x{v}" for k, v in c["sources"].items())
+    return f"${c['total']:.6f} total, ${c['mean_per_run']:.6f}/run ({src})"
+
+
+def format_telemetry(t: dict, runs: int) -> list[str]:
+    tin, tout, rt, sv, ov = (t["input_tokens"], t["output_tokens"], t["round_trip_ms"],
+                             t["server_elapsed_ms"], t["overhead_ms"])
+    status = ", ".join(f"{k} x{v}" for k, v in sorted(t["http_status"].items()))
+    return [
+        "Telemetry", "---------",
+        f"Tokens in:     {_int_fmt(tin['total'])} total, {_int_fmt(tin['mean'])}/run",
+        f"Tokens out:    {_int_fmt(tout['total'])} total, {_int_fmt(tout['mean'])}/run",
+        f"Cost:          {format_cost(t['cost_usd'])}",
+        f"Round trip:    mean {_fmt(rt['mean'], '.0f')} ms, p50 {_fmt(rt['p50'], '.0f')}, "
+        f"p95 {_fmt(rt['p95'], '.0f')}, max {_fmt(rt['max'], '.0f')} ms",
+        f"Jev elapsed:   mean {_fmt(sv['mean'], '.0f')} ms, p95 {_fmt(sv['p95'], '.0f')} ms (Jev's elapsedMs)",
+        f"Overhead:      mean {_fmt(ov['mean'], '.0f')} ms (round trip minus Jev elapsed: network, TLS, queueing)",
+        f"Attempts:      {t['attempts']} for {runs} runs ({t['runs_retried']} retried)",
+        f"HTTP status:   {status or 'n/a'}",
+        f"Request size:  mean {_int_fmt(t['request_bytes']['mean'])} bytes",
+    ]

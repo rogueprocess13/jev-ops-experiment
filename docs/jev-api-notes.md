@@ -38,6 +38,14 @@ Question types:
 - `noul` answers: `{"type": "noul", "noul": 0.95}`. The number is the probability of "yes". There is **no separate confidence field** for noul.
 - `score` answers: `score`, `legend`, `probabilities`, `confidence`.
 
+## Usage, timing and cost
+
+- `usage.input_tokens`, `usage.output_tokens`: token counts.
+- `elapsedMs`: "time from sending the request to receiving the result, including validation". Not pure inference time. The docs do not say exactly where it sits, so the adapter reads it at the top level and falls back to `usage.elapsedMs`.
+- The docs say usage "may include cost in USD" but do not name the field. The adapter takes any numeric `usage` key containing "cost" as reported cost, and keeps the raw `usage` object.
+- Pricing (https://thejevai.com/pricing, checked 2026-09-30): credit packs only (Starter $10 = 100,000 credits, Pro $100 = 1,000,000, Enterprise $1,000 = 11,000,000). No per-token or per-request rate is published, so the project has no default price.
+- No request ID or rate-limit headers are documented.
+
 ## Errors
 
 401 invalid key, 422 validation error, 429 rate limit, 529 overloaded. Retry 429 and 529 with exponential backoff.
