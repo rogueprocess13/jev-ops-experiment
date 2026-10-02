@@ -12,7 +12,7 @@ Greenfield Python repo. The goal is a credible benchmark: known scenario → kno
 
 **Non-Goals:**
 - Production monitoring, real telemetry, remediation actions.
-- Kubernetes, Prometheus, Grafana, Docker Compose.
+- Kubernetes, Prometheus, Grafana, Docker Compose. (Amended by change `otel-demo-tier2`: Docker Compose is allowed for the Tier 2 OpenTelemetry Demo testbed only. Tier 1 itself remains Python-only, and Kubernetes remains out of scope.)
 - Multi-model comparison (the adapter seam allows it later, but it is not built now).
 
 ## Decisions

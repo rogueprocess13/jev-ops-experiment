@@ -8,6 +8,18 @@ Prepared for discussion in the LF Edge AIOps forum.
 
 [![tests](https://github.com/rogueprocess13/jev-ops-experiment/actions/workflows/tests.yml/badge.svg)](https://github.com/rogueprocess13/jev-ops-experiment/actions/workflows/tests.yml)
 
+## Two tiers
+
+| | Tier 1: synthetic | Tier 2: OpenTelemetry Demo |
+|---|---|---|
+| Input | Seeded random server statistics | Real metrics, logs and traces from a running distributed application |
+| Tests | Basic decision reasoning | AIOps reasoning against realistic telemetry |
+| Ground truth | Hand-written expected decision per scenario | The fault the harness injected, hidden from Jev |
+| Infrastructure | None (Python only) | Docker Compose |
+| Run with | `./run-all.sh` (this page, below) | `./run-experiment F001` ([Tier 2](#tier-2-opentelemetry-demo)) |
+
+The two tiers share only the Jev client (`jev/client.py`). Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tier 2 has its own section.
+
 ## Quick start
 
 You need Python 3.10 or newer and git. Linux and macOS work as shown. On Windows, use WSL or see [Manual setup](#manual-setup).
@@ -205,6 +217,132 @@ How to read it:
 - A reply outside the allowed values is `invalid` and counts as incorrect. It is never adjusted.
 - A failed API call is `errored`. It is shown but excluded from accuracy.
 - Confidence is the mean of Jev's confidence for severity and action. The cause's own confidence is saved per run but not included. Jev gives no confidence for the yes/no question, only a probability of "yes". That probability is saved, and human review is `yes` when it is 0.5 or more. That threshold is our choice, not part of the Jev API.
+
+## Tier 2: OpenTelemetry Demo
+
+### What it tests
+
+Whether Jev can detect, locate and diagnose a real incident, and recommend an acceptable action, from the telemetry a distributed application produces. A controller injects a known fault into the [OpenTelemetry Demo](https://github.com/open-telemetry/opentelemetry-demo) (the "Astronomy Shop"), collects the metrics, logs and traces it generates, builds a normalized observation, asks Jev, and then scores the answer against the fault it injected. Jev never sees the fault.
+
+Four things are scored separately, as PASS, FAIL or UNKNOWN:
+
+| Dimension | Question |
+|---|---|
+| detection | Did Jev see an incident when there was one (and none when there was not)? |
+| localization | Did it name the service where the problem starts? |
+| diagnosis | Did it name the failure mode? |
+| action | Is its recommended action in the scenario's acceptable list? |
+
+There is no combined score. A run can find the right service and still fail on the action, and the results show that.
+
+### Why the OpenTelemetry Demo
+
+It is a maintained, widely known application with about 20 services in many languages, real telemetry through OpenTelemetry, a load generator, and a built-in fault mechanism (feature flags). Using it means we do not write our own app or fake telemetry, and anyone can pull the same version. Pinned to release **3.1.0**.
+
+### Architecture
+
+```
+scenario (YAML) ──► Experiment controller (tier2/runner.py)
+                          │ inject fault via flagd flag       ▲ reset (always)
+                          ▼                                   │
+                  OpenTelemetry Demo 3.1.0  ◄── Locust load
+                          │ OTLP
+                          ▼
+         Prometheus (metrics) · Jaeger (traces) · OpenSearch (logs)
+                          │ HTTP, tier2/collectors/
+                          ▼
+              Observation builder + scrubber  (no scenario, fault or ground truth in scope)
+                          │
+                          ▼
+              AIOpsEngine ──► JevAdapter ──► Jev
+                          │ Decision (raw response kept)
+                          ▼
+                  Evaluator: Decision vs GroundTruth ──► results/tier2/<run-id>/<ID>.json
+```
+
+### Prerequisites
+
+- Docker with the Compose plugin
+- About 8 GB of free memory for the full stack (`TIER2_PROFILE=minimal` needs about 4 GB and drops Kafka, accounting and fraud-detection)
+- Python 3.10+, git, and a Jev API key in `.env`
+
+### Start the demo
+
+```bash
+./setup.sh --start        # creates .venv, clones the demo at 3.1.0, pulls images, starts it
+./health-check.sh         # wait ~3 minutes after start; all checks must pass
+```
+
+Stop it with `tier2/testbed/stop.sh` (this also removes its volumes).
+
+The demo's own `.env` says `DEMO_VERSION=latest`. The scripts set `DEMO_VERSION=3.1.0` as an environment variable on every Compose call, so the images match the tag and the checkout stays unmodified.
+
+### Verify telemetry
+
+`./health-check.sh` checks, in order: the frontend, Prometheus, span metrics, Jaeger, OpenSearch, that every flag is `off`, and that the load generator is running. It exits non-zero and names the failing check. Span metrics appear a couple of minutes after the stack starts.
+
+You can also look by hand through Envoy: <http://localhost:8080> (shop), `/jaeger/ui/`, `/grafana/`, `/loadgen/` (Locust), and Prometheus on <http://localhost:9090>.
+
+### How faults are injected
+
+Only through the demo's own **flagd** feature flags, never by killing containers. The injector reads the flag config from the flagd-ui API, changes one variant, writes it back and reads it back to confirm; flagd reloads the file within about a second. Two flag shapes exist: most are enabled by setting `defaultVariant`, but `productCatalogFailure` has a targeting rule, so the injector sets the rule's matched branch instead (and only product `OLJCESPC7Z` fails).
+
+`./run-experiment` always resets in a `finally` block. If a run is interrupted, `python -m tier2 reset-faults` turns every flag off.
+
+### How Jev receives observations
+
+Jev receives one JSON object, the same shape every run, built only from collected telemetry:
+
+| Field group | Contents |
+|---|---|
+| `window`, `baseline_window` | start and end timestamps of the observation and of the baseline before the fault |
+| `services` | per service: request rate, error rate, p50 and p95 latency, baseline values and the change from baseline. Ranked by change, top 12 |
+| `dependencies` | caller to callee edges with call and error counts (from traces), top 20 |
+| `error_logs` | WARN and ERROR lines, deduplicated with a count, at most 3 per service for 8 services, 240 characters each |
+| `failing_traces` | up to 5 failing traces: the service path, duration, and the failed spans with the error text |
+
+The whole observation is capped at 60,000 bytes; the lowest-ranked items are trimmed first, and what was trimmed is recorded in the result file only. Jev is asked four fixed questions (`incident_detected`, `affected_service`, `diagnosis`, `recommended_action`) with the same answer vocabulary every time, including `unknown`, `none` and `no_action` so it is never forced to guess.
+
+**What Jev does not receive:** the experiment ID, the flag name or variant, the target service as a label, the expected diagnosis or action, any evaluation, or `feature_flag` data. A scrubber removes flag names, `flagd` and `feature_flag` attributes from all telemetry, and the collectors exclude `flagd`, `flagd-ui`, `telemetry-docs` and `load-generator` entirely. Tests run every scenario through the full path with deliberately contaminated fixtures and fail if any of these reaches the engine.
+
+Limit: service names and error messages are evidence and are sent. A model could in principle recognise the demo and know its flags from training data. That cannot be removed, only noted.
+
+### Run experiments
+
+```bash
+./run-experiment list            # experiment IDs
+./run-experiment F000            # healthy control: any incident reported is a false positive
+./run-experiment F003            # one fault
+./run-all-experiments            # the whole catalogue
+./run-all-experiments --repeats 3
+```
+
+Each run follows the same lifecycle: check health, wait for steady load, take a baseline, inject, wait for the fault to show up, collect, build the observation, ask Jev, store the raw answer, evaluate, **reset the fault**, and check the system returned to baseline. If it did not, the run is marked `contaminated` and the batch stops, because later experiments would be invalid. Each run makes one Jev call and takes about 8 to 10 minutes.
+
+| ID | Fault (flagd flag) | What it tests |
+|---|---|---|
+| F000 | none | healthy control, false positives |
+| F001 | `productCatalogFailure` | direct failure of one product in product-catalog |
+| F003 | `paymentFailure` | transaction failure, symptom in checkout |
+| F004 | `paymentUnreachable` | misleading symptoms: checkout errors, payment healthy |
+| F005 | `imageSlowLoad` | latency only, no errors, origin in the proxy |
+| F006 | `productCatalogLockContention` | database-level degradation |
+
+`F002` (`cartFailure`) and the first `F005` (`intlShippingSlowdown`) were dropped: neither produced a measurable effect in 3.1.0.
+
+See `docs/otel-demo-notes.md` for how each flag was verified and which ones behaved differently from the demo's documentation.
+
+### How results are evaluated
+
+`tier2/evaluate.py` is a pure function of the stored Jev decision and the hidden ground truth, run after the answer is stored. Detection compares the incident flag; localization the service; diagnosis the failure mode; action checks the recommendation against the scenario's acceptable list. UNKNOWN means Jev's reply was invalid or the call failed, and is never counted as PASS or FAIL. Aggregates give counts per dimension and a false-positive rate over control runs. Ground truth is hand-written in each scenario file with a rationale; it is never derived from Jev or from the collected telemetry.
+
+Results are written to `results/tier2/<run-id>/<ID>.json` (git-ignored) with the fault, ground truth, Jev's normalized answer and **raw response**, the four verdicts, timing (`null` when not measurable), the exact request sent, the demo image versions and the git commit.
+
+### Add a new experiment
+
+1. Pick a flag from `tier2/testbed/opentelemetry-demo/src/flagd/demo.flagd.json` and check it produces a visible effect (see `docs/otel-demo-notes.md`).
+2. Copy a file in `tier2/scenarios/`, set a new `experiment_id`, the `fault` (flag and variant), the `expected` block and a `rationale` explaining why that is the right answer.
+3. `./run-experiment list` shows it. Loading checks the vocabulary, the service names and that the flag and variant exist in the pinned flag file.
 
 ## Tests
 

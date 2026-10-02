@@ -25,3 +25,5 @@ results/*
 .vscode/
 *.swp
 .DS_Store
+tier2/testbed/opentelemetry-demo/
+tier2/testbed/IMAGES

@@ -239,6 +239,20 @@ def _default_post(url, headers, payload, timeout):
     return requests.post(url, headers=headers, json=payload, timeout=timeout)
 
 
+@dataclass
+class Reply:
+    """Transport result of one send(): what came back, before any interpretation."""
+    status: str = STATUS_ERROR  # ok (HTTP 200 + JSON) | invalid (not JSON) | error
+    body: dict | None = None
+    message: str = ""
+    attempts: int = 0
+    http_status: int | None = None
+    latency_ms: float | None = None  # round trip of the answering attempt
+    total_ms: float | None = None  # whole call, incl. retries and backoff
+    request_bytes: int | None = None
+    response_bytes: int | None = None
+
+
 class JevClient:
     def __init__(self, config: JevConfig | None = None, post: PostFn = _default_post,
                  sleep: Callable[[float], None] = time.sleep):
@@ -246,54 +260,68 @@ class JevClient:
         self._post = post
         self._sleep = sleep
 
-    def build_request(self, observations: dict) -> dict:
+    def build_request(self, observations: dict, questions: dict | None = None,
+                      state_key: str = "server_observations") -> dict:
+        """Tier 1 defaults give the original request; Tier 2 passes its own questions."""
         return {
-            "state": {"server_observations": observations},
+            "state": {state_key: observations},
             "model": self.config.model,
-            "questions": QUESTIONS,
+            "questions": QUESTIONS if questions is None else questions,
         }
 
-    def decide(self, observations: dict) -> Decision:
+    def send(self, payload: dict) -> Reply:
+        """POST one payload with bounded retries. Interprets nothing in the answer."""
         cfg = self.config
         headers = {"Authorization": f"Bearer {cfg.api_key}", "Content-Type": "application/json"}
-        payload = self.build_request(observations)
-        request_bytes = len(json.dumps(payload).encode())
+        reply = Reply(request_bytes=len(json.dumps(payload).encode()))
         started = time.perf_counter()
-        last, status, attempts = "no attempt made", None, 0
+        last = "no attempt made"
 
-        def done(d: Decision, latency=None, resp=None) -> Decision:
-            d.attempts, d.http_status, d.request_bytes = attempts, status, request_bytes
-            d.total_ms = (time.perf_counter() - started) * 1000
-            if latency is not None:
-                d.latency_ms = latency
-            if resp is not None:
-                d.response_bytes = len((resp.text or "").encode())
-            return d
+        def finish(**kw) -> Reply:
+            reply.total_ms = (time.perf_counter() - started) * 1000
+            for k, v in kw.items():
+                setattr(reply, k, v)
+            return reply
 
         for attempt in range(cfg.max_retries + 1):
             if attempt:
                 self._sleep(min(2 ** (attempt - 1), 30))
-            attempts += 1
+            reply.attempts += 1
             t0 = time.perf_counter()
             try:
                 resp = self._post(cfg.url, headers, payload, cfg.timeout_s)
             except requests.RequestException as e:
-                last, status = f"{type(e).__name__}", None
+                last, reply.http_status = f"{type(e).__name__}", None
                 continue
             latency = (time.perf_counter() - t0) * 1000
-            status = resp.status_code
-            if status in RETRY_STATUSES:
-                last = f"HTTP {status}"
+            reply.http_status = resp.status_code
+            if resp.status_code in RETRY_STATUSES:
+                last = f"HTTP {resp.status_code}"
                 continue
-            if status != 200:
-                return done(Decision(status=STATUS_ERROR, message=f"HTTP {status}: {resp.text[:200]}"),
-                            latency, resp)
+            reply.latency_ms = latency
+            reply.response_bytes = len((resp.text or "").encode())
+            if resp.status_code != 200:
+                return finish(status=STATUS_ERROR,
+                              message=f"HTTP {resp.status_code}: {resp.text[:200]}")
             try:
-                body = resp.json()
+                reply.body = resp.json()
             except ValueError:
-                return done(Decision(status=STATUS_INVALID, message="response body is not JSON"),
-                            latency, resp)
-            d = parse_response(body)
-            apply_usage(d, body, cfg)  # tokens are billed even for an invalid answer
-            return done(d, latency, resp)
-        return done(Decision(status=STATUS_ERROR, message=f"gave up after retries: {last}"))
+                return finish(status=STATUS_INVALID, message="response body is not JSON")
+            return finish(status=STATUS_OK)
+        reply.latency_ms = reply.response_bytes = None
+        return finish(status=STATUS_ERROR, message=f"gave up after retries: {last}")
+
+    def decide(self, observations: dict) -> Decision:
+        r = self.send(self.build_request(observations))
+        if r.status == STATUS_OK:
+            d = parse_response(r.body)
+            apply_usage(d, r.body, self.config)  # tokens are billed even for an invalid answer
+        else:
+            d = Decision(status=r.status, message=r.message)
+        d.attempts, d.http_status, d.request_bytes = r.attempts, r.http_status, r.request_bytes
+        d.total_ms = r.total_ms
+        if r.latency_ms is not None:
+            d.latency_ms = r.latency_ms
+        if r.response_bytes is not None:
+            d.response_bytes = r.response_bytes
+        return d

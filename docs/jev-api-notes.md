@@ -76,3 +76,19 @@ The model version that answered is in the response `model` field. It is recorded
 ## Python
 
 Python 3.10 or newer. Runtime deps: `requests`, `python-dotenv`. Test dep: `pytest`.
+
+## Tier 2 use (OpenTelemetry Demo)
+
+Tier 2 reuses the same endpoint and question types through `JevClient.send` (transport only) and `tier2/jev_adapter.py` (questions and parsing). No new API features are used.
+
+| Question | Type | Notes |
+|---|---|---|
+| `incident_detected` | `noul` | P(yes). Incident if >= 0.5 (our threshold). No confidence value, as for any noul. |
+| `affected_service` | `choice` | 19 options (18 demo services plus `none`), well under the 255 limit. Same list every run. |
+| `diagnosis` | `choice` | 7 options. |
+| `recommended_action` | `choice` | 6 options. |
+
+- State key is `observations` (Tier 1 uses `server_observations`). The API takes an arbitrary `state` object.
+- Overall confidence is the mean of the three choice confidences when present, else `null`. The noul probability is stored separately in the raw response.
+- Jev's reply has no free-text reasoning field in the docs checked, so `reasoning` is `null` unless a `reasoning` string appears in the body. The raw response is always stored.
+- **Size.** The 32k-token limit above comes from the Pydantic AI page, not from the Jev API docs, so it is unverified for this endpoint. A real observation can be large, so the builder caps it at 60,000 bytes (about 15k tokens at roughly 4 bytes per token) before the questions are added. If real runs show Jev rejecting requests, lower `BYTE_BUDGET` in `tier2/observation.py` and record the finding.
