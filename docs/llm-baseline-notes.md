@@ -50,6 +50,8 @@ Ollama 0.22.1, local HTTP API:
 
 - `POST {OLLAMA_URL}/api/chat` with `model`, `messages` (system + user), `format` (a JSON schema, which constrains the output), `stream: false`, `options: {"temperature": 0, "seed": <run seed>}`.
 - Response: `message.content` (the JSON answer), `prompt_eval_count` (input tokens), `eval_count` (output tokens), `total_duration` (nanoseconds), `model`.
+- qwen3 thinks before answering by default. Its reasoning comes back in `message.thinking` and is not included in `eval_count`, so `output_tokens` covers only the final JSON answer, while latency includes the thinking. Seen in the 2026-10-05 batch: 35-39 output tokens next to 1,800-12,700 characters of thinking.
+- Local timings depend on the machine. The machine used for the 2026-10-05 batch is listed in [results-2026-10-05-tier1-baselines.md](results-2026-10-05-tier1-baselines.md#test-machine-for-the-local-qwen38b-run).
 - An unknown model is an HTTP 404 and counts as `error`. A server that cannot be reached is an `error` naming `OLLAMA_URL`.
 - Cost is `n/a` (local).
 

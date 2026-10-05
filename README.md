@@ -224,6 +224,8 @@ The seed fixes the **input**: the same scenario and seed always produce the same
 
 ## Results
 
+First full comparison (Jev, Claude Sonnet, Claude Opus, qwen3:8b; 70 runs each): [docs/results-2026-10-05-tier1-baselines.md](docs/results-2026-10-05-tier1-baselines.md).
+
 Each run writes to `results/` (git-ignored):
 
 - `<timestamp>-<N>runs.jsonl`: one JSON line per run: scenario, seed, observations and logs exactly as sent to Jev, expected outcome, Jev's decision, per-field probabilities and confidence, latency, raw response, and match flags.
@@ -441,6 +443,7 @@ evaluation/evaluator.py   comparison, aggregation, summary text
 tests/                    offline unit tests
 docs/jev-api-notes.md     Jev API notes
 docs/llm-baseline-notes.md API notes for the baseline engines
+docs/results-2026-10-05-tier1-baselines.md  first four-engine comparison, with test machine
 openspec/                 specs, design and tasks for this project
 ```
 
