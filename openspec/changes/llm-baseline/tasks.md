@@ -40,4 +40,4 @@
 ## 7. First comparison (live, needs approval)
 
 - [x] 7.1 One run per engine (`--scenario degraded --seed 1234`) to check each transport end to end
-- [ ] 7.2 70-run batches with the same `--seed` for Jev, `claude-sonnet`, `claude-opus` and `ollama:qwen3:8b`, then `report.py --compare`
+- [x] 7.2 70-run batches with the same `--seed` for Jev, `claude-sonnet`, `claude-opus` and `ollama:qwen3:8b`, then `report.py --compare`

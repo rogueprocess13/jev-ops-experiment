@@ -87,7 +87,7 @@ def telemetry(records: list[dict]) -> dict:
         },
         "round_trip_ms": _stats(rt),
         "server_elapsed_ms": _stats(server),
-        "overhead_ms": _stats(overhead),  # round trip minus Jev's elapsedMs
+        "overhead_ms": _stats(overhead),  # round trip minus the engine's own reported time
         "total_ms": _stats(d.get("total_ms") for d in ds),
         "attempts": sum(d.get("attempts") or 0 for d in ds),
         "runs_retried": sum(1 for d in ds if (d.get("attempts") or 0) > 1),
@@ -206,8 +206,8 @@ def format_telemetry(t: dict, runs: int) -> list[str]:
         f"Cost:          {format_cost(t['cost_usd'])}",
         f"Round trip:    mean {_fmt(rt['mean'], '.0f')} ms, p50 {_fmt(rt['p50'], '.0f')}, "
         f"p95 {_fmt(rt['p95'], '.0f')}, max {_fmt(rt['max'], '.0f')} ms",
-        f"Jev elapsed:   mean {_fmt(sv['mean'], '.0f')} ms, p95 {_fmt(sv['p95'], '.0f')} ms (Jev's elapsedMs)",
-        f"Overhead:      mean {_fmt(ov['mean'], '.0f')} ms (round trip minus Jev elapsed: network, TLS, queueing)",
+        f"Engine time:   mean {_fmt(sv['mean'], '.0f')} ms, p95 {_fmt(sv['p95'], '.0f')} ms (as the engine reports it)",
+        f"Overhead:      mean {_fmt(ov['mean'], '.0f')} ms (round trip minus engine time: network, startup, queueing)",
         f"Attempts:      {t['attempts']} for {runs} runs ({t['runs_retried']} retried)",
         f"HTTP status:   {status or 'n/a'}",
         f"Request size:  mean {_int_fmt(t['request_bytes']['mean'])} bytes",
