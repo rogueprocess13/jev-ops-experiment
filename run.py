@@ -6,8 +6,12 @@
     python run.py --scenario ambiguous --seed 1234 reproducible input
     python run.py --runs 70                        batch, scenarios in rotation
     python run.py --runs 70 --no-logs              same, but metrics only (no logs)
+    python run.py --runs 70 --engine claude-sonnet same batch, answered by a baseline LLM
 
-Read-only: it generates data, asks Jev, and records the answer. It never acts on it.
+Engines: jev (default), claude-sonnet, claude-opus, ollama:<model>. Every engine
+gets the same observation and the same questions.
+
+Read-only: it generates data, asks the engine, and records the answer. It never acts on it.
 """
 from __future__ import annotations
 
@@ -23,7 +27,8 @@ from pathlib import Path
 
 from evaluation.evaluator import FIELDS, aggregate, format_summary, make_record
 from generator.server_state import generate
-from jev.client import ConfigError, JevClient
+from jev.client import ConfigError
+from llm.engines import ENGINE_CHOICES, build_engine, engine_info, engine_slug, parse_engine
 from scenarios.definitions import get_scenario, scenario_names
 
 
@@ -69,7 +74,7 @@ def format_run_telemetry(d: dict) -> list[str]:
     return [
         f"Tokens:       {_n(d.get('input_tokens'))} in / {_n(d.get('output_tokens'))} out",
         f"Cost:         {cost}",
-        f"Round trip:   {_n(d.get('latency_ms'), '.0f', ' ms')}  (Jev elapsed {_n(d.get('server_elapsed_ms'), '.0f', ' ms')})",
+        f"Round trip:   {_n(d.get('latency_ms'), '.0f', ' ms')}  (server elapsed {_n(d.get('server_elapsed_ms'), '.0f', ' ms')})",
         f"Total:        {_n(d.get('total_ms'), '.0f', ' ms')}  in {d.get('attempts', 0)} attempt(s), HTTP {d.get('http_status') or 'n/a'}",
         f"Request:      {_n(d.get('request_bytes'))} bytes",
     ]
@@ -81,6 +86,12 @@ def _git_commit() -> str | None:
                               text=True, timeout=5, cwd=Path(__file__).parent).stdout.strip() or None
     except (OSError, subprocess.SubprocessError):
         return None
+
+
+def _engine_heading(record: dict) -> list[str]:
+    e = record.get("engine") or {"name": "jev"}
+    title = "Jev" if e["name"] == "jev" else f"{e['name']} ({e.get('transport')})"
+    return [title, "-" * len(title)]
 
 
 def format_run(record: dict) -> str:
@@ -110,15 +121,15 @@ def format_run(record: dict) -> str:
         f"Human review: {e['human_review']}",
         f"Cause:        {e.get('probable_cause', 'n/a')}",
         "",
-        "Jev", "---",
+        *_engine_heading(record),
     ]
     if d["status"] == "ok":
         conf = d["confidence"]
-        p = d["human_review_probability"]
+        p = d.get("human_review_probability")
         lines += [
             f"Severity:     {d['severity']}",
             f"Action:       {d['action']}",
-            f"Human review: {d['human_review']}  (P(yes)={p:.2f})",
+            f"Human review: {d['human_review']}" + ("" if p is None else f"  (P(yes)={p:.2f})"),
             f"Cause:        {d.get('probable_cause')}",
             f"Confidence:   {'n/a' if conf is None else f'{conf:.2f}'}",
         ]
@@ -140,6 +151,7 @@ def format_run(record: dict) -> str:
 
 def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None, out=print,
                    include_logs=True):
+    info = engine_info(client)
     verbose = (runs == 1) if verbose is None else verbose
     records = []
     started_at = datetime.now(timezone.utc)
@@ -149,8 +161,12 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
         obs = generate(scenario, seed).to_dict()
         if not include_logs:  # ablation: same metrics, logs withheld from Jev
             obs.pop("logs")
-        decision = client.decide(obs)
+        if getattr(client, "accepts_seed", False):  # local models: reproducible per run
+            decision = client.decide(obs, seed=seed)
+        else:
+            decision = client.decide(obs)
         rec = make_record(i, name, seed, obs, scenario.expected, decision)
+        rec["engine"] = {**info, "model_version": decision.to_dict().get("model_version")}
         rec["include_logs"] = include_logs
         rec["log_lines_sent"] = len(obs.get("logs", []))
         rec["started_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -168,7 +184,8 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    base = out_dir / f"{stamp}-{runs}runs{'' if include_logs else '-nologs'}"
+    suffix = "" if info["name"] == "jev" else f"-{engine_slug(info['name'])}"
+    base = out_dir / f"{stamp}-{runs}runs{'' if include_logs else '-nologs'}{suffix}"
     with open(f"{base}.jsonl", "w") as fh:
         for r in records:
             fh.write(json.dumps(r) + "\n")
@@ -181,6 +198,7 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
             "git_commit": _git_commit(),
             "python": platform.python_version(),
             "platform": platform.platform(),
+            "engine": info,
             "jev_url": getattr(getattr(client, "config", None), "url", None),
             "jev_model_requested": getattr(getattr(client, "config", None), "model", None),
             "models": sorted({r["decision"].get("model_version") for r in records
@@ -203,10 +221,16 @@ def parse_args(argv=None):
     p.add_argument("--output-dir", default="results")
     p.add_argument("--verbose", action="store_true", help="print full detail for every run in a batch")
     p.add_argument("--no-logs", action="store_true",
-                   help="withhold application logs from Jev (metrics only), to compare against runs with logs")
+                   help="withhold application logs from the engine (metrics only), to compare against runs with logs")
+    p.add_argument("--engine", default="jev",
+                   help=f"who answers: {', '.join(ENGINE_CHOICES)} (default jev)")
     a = p.parse_args(argv)
     if a.runs < 1:
         p.error("--runs must be at least 1")
+    try:
+        parse_engine(a.engine)
+    except ValueError as e:
+        p.error(str(e))
     if a.scenario and a.scenario != "random" and a.scenario not in scenario_names():
         p.error(f"unknown scenario {a.scenario!r}; valid: {', '.join(scenario_names())}, random")
     return a
@@ -216,7 +240,7 @@ def main(argv=None, client=None) -> int:
     a = parse_args(argv)
     if client is None:
         try:
-            client = JevClient()
+            client = build_engine(a.engine)
         except ConfigError as e:
             print(f"error: {e}", file=sys.stderr)
             return 2

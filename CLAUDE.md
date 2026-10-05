@@ -10,15 +10,15 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 
 - **Expected outcomes are hand-written** in `scenarios/definitions.py`. Never derive them from Jev or any other LLM, and never make them depend on generated values or the seed.
 - **Tests never assert what real Jev answers.** Jev's output is what the experiment measures. Use `FakeClient` from `tests/helpers.py` or canned HTTP responses. Tests must pass offline with no API key.
-- **Jev sees only the observations.** Never put the scenario name, expected outcome, or any hint in the request (`test_request_does_not_contain_scenario_or_expected` guards this).
+- **Jev sees only the observations.** Never put the scenario name, expected outcome, or any hint in the request (`test_request_does_not_contain_scenario_or_expected` guards this). The same holds for every baseline engine (`test_prompt_does_not_leak_scenario_or_expected` in `tests/test_llm.py`).
 - **PASS/FAIL is the operational decision only** (severity, action, human review). `probable_cause` is a diagnosis, scored separately (`DIAGNOSIS_FIELDS` in `evaluation/evaluator.py`). Do not fold it into `overall`.
-- **Never invent cost.** Use a cost Jev reports, or estimate from user-set `JEV_PRICE_*` prices, else `n/a`. Do not add a default price: Jev publishes none.
+- **Never invent cost.** Use a cost the engine reports, or estimate from user-set `JEV_PRICE_*` / `CLAUDE_*_PRICE_*` prices, else `n/a`. Do not build in a default price, not even a published one.
 - **Do not coerce or guess.** An out-of-set Jev reply is `invalid` and counts as incorrect. A failed call is `error` and is excluded from accuracy.
 - **Never hard-code or invent results.** Every reported figure is computed from the run records.
 - **All randomness comes from `random.Random(seed)`** inside the generator. Never use the global RNG. Logs are generated *after* metrics and services, so adding log kinds never changes a seed's metrics. Keep it that way.
 - **Log lines must not leak the answer.** No scenario names, and no wording that tells Jev what to do (`test_logs_do_not_leak_scenario_or_answer`).
 - **Secrets stay in `.env`** (git-ignored). Never log, store or commit `JEV_API_KEY`. `Decision` objects and result files must not contain it.
-- **All Jev HTTP and API code lives in `jev/client.py`** (transport, retries, usage telemetry; Tier 1 questions and parsing too). Tier 2's question set and answer parsing live in `tier2/jev_adapter.py`, which calls `JevClient.send`. Nothing else may import HTTP or API details. API facts are in `docs/jev-api-notes.md`. Check the current docs at https://docs.typesafe.ai/api before changing request or response handling. Do not guess parameters.
+- **All Jev HTTP and API code lives in `jev/client.py`** (transport, retries, usage telemetry; Tier 1 questions and parsing too). Tier 2's question set and answer parsing live in `tier2/jev_adapter.py`, which calls `JevClient.send`. Baseline LLM engines (Claude API, `claude -p` fallback, Ollama) live in `llm/` and are the only other code that calls a model; they reuse `QUESTIONS` and `Decision` from `jev/client.py`, so every engine gets the same questions. Nothing else may import HTTP or API details. API facts are in `docs/jev-api-notes.md`. Check the current docs at https://docs.typesafe.ai/api before changing request or response handling. Do not guess parameters.
 
 ## Tier 2 rules (OpenTelemetry Demo)
 
@@ -42,7 +42,9 @@ scenarios/definitions.py   scenarios, expected outcomes, rationale, metric profi
 generator/server_state.py  seeded, scenario-correlated observations
 generator/app_logs.py      seeded, templated application logs (called by server_state)
 jev/client.py              Jev adapter (only Jev-specific code)
+llm/                       baseline engines: prompt.py (shared questions), claude.py, ollama.py, engines.py
 evaluation/evaluator.py    compare, aggregate, summary text (pure functions)
+evaluation/metrics.py      F1, detection, latency percentiles, reliability, cost (pure); metrics_report.py renders them
 tests/                     offline unit tests
 docs/jev-api-notes.md      Jev API notes with sources
 openspec/                  proposal, design, specs, tasks for the project
@@ -71,17 +73,20 @@ setup.sh health-check.sh run-experiment run-all-experiments   Tier 2 entry point
 | Metrics only | `python run.py --runs 70 --no-logs` |
 | Everything (Tier 1) | `./run-all.sh [runs]` |
 | Report | `python report.py [results/file.jsonl]` |
+| Baseline LLM batch | `python run.py --runs 70 --seed 1000 --engine claude-sonnet` (or `claude-opus`, `ollama:qwen3:8b`) |
+| Compare engines | `python report.py --compare A.jsonl B.jsonl ...` |
+| Metrics (F1, p95, ...) | `python report.py --metrics A.jsonl [B.jsonl ...]` |
 | Tier 2 setup | `./setup.sh --start` (clones the demo at 3.1.0, pulls, starts) |
 | Tier 2 health | `./health-check.sh` |
 | Tier 2 one run | `./run-experiment F003` (`list` shows IDs) |
 | Tier 2 batch | `./run-all-experiments [--repeats N]` |
 | Tier 2 unstick | `python -m tier2 reset-faults` |
 
-`run.py` and `run-all.sh` need `JEV_API_KEY` in `.env`. Each run makes one real API call, so use small `--runs` while developing.
+`run.py` and `run-all.sh` need `JEV_API_KEY` in `.env` for the default `jev` engine. Each run makes one real model call, so use small `--runs` while developing.
 
 ## Conventions
 
-- Python 3.10+. Dependencies: `requests`, `python-dotenv`, `pyyaml`, `pytest`.
+- Python 3.10+. Dependencies: `requests`, `python-dotenv`, `pyyaml`, `pytest`, `anthropic` (baseline engines only).
 - Keep it simple. Do not add Kubernetes. Docker Compose is allowed **only** for the Tier 2 testbed (the OpenTelemetry Demo); Tier 1 stays Python-only. Prometheus, Jaeger, OpenSearch and Grafana are the demo's own components, queried over HTTP, not something this repo deploys.
 - Changing a scenario's expected outcome or profile is a change to the experiment, not a bug fix. Update its rationale, the README table and the tests, and say so in the commit.
 - Mark tasks done in `openspec/changes/jev-ops-experiment-v1/tasks.md` (Tier 1) and `openspec/changes/otel-demo-tier2/tasks.md` (Tier 2) as work completes.

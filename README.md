@@ -94,6 +94,45 @@ python run.py --runs 70 --seed 1000 --no-logs
 
 Without logs, Jev cannot see the evidence for `hung_worker` and `log_only_errors`, so expect those to fail. The comparison shows how much the logs contribute. Results from a metrics-only run are saved with a `-nologs` suffix, and the report states which mode was used.
 
+### Compare with an LLM (`--engine`)
+
+Is Jev better than asking a general-purpose LLM? `--engine` sends the same observation, with the same questions and the same allowed options, to a baseline model instead of Jev. Scenarios, expected outcomes and scoring do not change.
+
+| Engine | Model | Needs |
+|---|---|---|
+| `jev` (default) | Jev (`jev-latest`) | `JEV_API_KEY` |
+| `claude-sonnet` | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | `ANTHROPIC_API_KEY`, or the `claude` CLI |
+| `claude-opus` | Claude Opus 5.5 (`claude-opus-5-5`) | `ANTHROPIC_API_KEY`, or the `claude` CLI |
+| `ollama:<model>` | any local Ollama model, for example `ollama:qwen3:8b` | Ollama running locally |
+
+Use the same `--seed` and `--runs` for every engine, then compare:
+
+```bash
+python run.py --runs 70 --seed 1000
+python run.py --runs 70 --seed 1000 --engine claude-sonnet
+python run.py --runs 70 --seed 1000 --engine ollama:qwen3:8b
+python report.py --compare results/A.jsonl results/B.jsonl results/C.jsonl
+```
+
+Things to know:
+
+- **Claude without an API key.** If `ANTHROPIC_API_KEY` is not set, the Claude engines use the `claude` CLI (`claude -p`) instead and print a warning first. It runs in an empty temporary directory with no tools, settings, hooks or MCP servers, but it is still the Claude Code harness, not the bare API. Those results are labelled `transport=claude-cli`, and the comparison report says so. Set the key for the cleanest comparison.
+- **Confidence.** Only Jev returns probabilities. The LLMs return none, and none is made up, so confidence is not compared.
+- **Cost.** Claude API cost is `n/a` unless you set the `CLAUDE_*_PRICE_*` variables (`.env.example` lists Anthropic's prices on 2026-10-05 as commented examples). The CLI reports a cost itself; on a subscription plan that figure is notional. Ollama is local, so cost is `n/a`.
+- **Repeatability.** Ollama runs use temperature 0 and the run seed, so they repeat exactly. Claude models do not accept a temperature, so repeat runs (10 per scenario) and look at the spread.
+- **Refusals.** A Claude refusal counts as `invalid` (wrong). No other model is asked in its place.
+- `./run-all.sh 70 --seed 1000 --engine claude-sonnet` works too. It only asks for `JEV_API_KEY` when the engine is Jev.
+
+API details for the baseline engines are in [docs/llm-baseline-notes.md](docs/llm-baseline-notes.md).
+
+### Metrics report (F1, p95, detection rate...)
+
+```bash
+python report.py --metrics results/A.jsonl [results/B.jsonl ...]
+```
+
+Writes `results/<timestamp>-metrics-report.md` with one column per file: accuracy with 95% confidence intervals, precision/recall/F1 per class plus macro and weighted F1, incident detection (recall, false positive rate, miss rate), human-review F1, over- and under-reaction, Brier score (Jev only), latency p50/p90/p95/p99, availability and error rates, tokens and cost per run and per correct decision, and confusion matrices. It ends with a glossary, and a section on metrics that do not apply here (MTTD, MTTR, MTBF, uptime) and why.
+
 ## Prerequisites
 
 - Python 3.10 or newer (CI tests 3.10, 3.11, 3.12 and 3.13)
@@ -140,6 +179,11 @@ Dependencies are pinned in `requirements.txt` to the tested versions.
 | `JEV_MAX_RETRIES` | no | `3` |
 | `JEV_PRICE_INPUT_PER_MTOK` | no | none (USD per million input tokens, to estimate cost) |
 | `JEV_PRICE_OUTPUT_PER_MTOK` | no | none (USD per million output tokens) |
+| `ANTHROPIC_API_KEY` | only for `--engine claude-*` via the API | none (without it, the `claude` CLI is used) |
+| `LLM_EFFORT` | no | `medium` (Claude effort: `low`, `medium`, `high`, `xhigh`, `max`) |
+| `OLLAMA_URL` | no | `http://localhost:11434` |
+| `CLAUDE_SONNET_PRICE_INPUT_PER_MTOK`, `CLAUDE_SONNET_PRICE_OUTPUT_PER_MTOK` | no | none (USD per million tokens, to estimate cost) |
+| `CLAUDE_OPUS_PRICE_INPUT_PER_MTOK`, `CLAUDE_OPUS_PRICE_OUTPUT_PER_MTOK` | no | none |
 
 `.env` is git-ignored. Never commit a key.
 
@@ -392,9 +436,11 @@ scenarios/definitions.py  scenarios, expected outcomes, rationale
 generator/server_state.py synthetic observations
 generator/app_logs.py     synthetic application logs
 jev/client.py             Jev adapter (the only Jev-specific code)
+llm/                      baseline engines: Claude (API or claude CLI), Ollama
 evaluation/evaluator.py   comparison, aggregation, summary text
 tests/                    offline unit tests
 docs/jev-api-notes.md     Jev API notes
+docs/llm-baseline-notes.md API notes for the baseline engines
 openspec/                 specs, design and tasks for this project
 ```
 
