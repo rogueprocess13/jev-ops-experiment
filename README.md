@@ -30,7 +30,7 @@ cd jev-ops-experiment
 ./run-all.sh --check      # sets up .venv, installs, runs the tests. No key, no API calls.
 ```
 
-Then get a Jev API key at <https://thejevai.com/settings/apikeys>, put it in `.env` (the check created it for you):
+Then get a Jev API key from the TypeSafe console at <https://console.typesafe.ai/>, put it in `.env` (the check created it for you):
 
 ```bash
 JEV_API_KEY=your-real-key
@@ -97,7 +97,7 @@ Without logs, Jev cannot see the evidence for `hung_worker` and `log_only_errors
 ## Prerequisites
 
 - Python 3.10 or newer (CI tests 3.10, 3.11, 3.12 and 3.13)
-- A Jev API key from <https://thejevai.com/settings/apikeys>. Not needed for `./run-all.sh --check` or the tests.
+- A Jev API key from the TypeSafe console, <https://console.typesafe.ai/>. (thejevai.com is a separate site, not affiliated with TypeSafe. See [docs/jev-api-notes.md](docs/jev-api-notes.md).) Not needed for `./run-all.sh --check` or the tests.
 - Optional: Docker
 
 ## Manual setup
@@ -134,7 +134,7 @@ Dependencies are pinned in `requirements.txt` to the tested versions.
 | Variable | Required | Default |
 |---|---|---|
 | `JEV_API_KEY` | yes | none |
-| `JEV_API_URL` | no | `https://thejevai.com/v1/systemone` |
+| `JEV_API_URL` | no | `https://api.typesafe.ai/v1/systemone` |
 | `JEV_MODEL` | no | `jev-latest` |
 | `JEV_TIMEOUT_S` | no | `30` |
 | `JEV_MAX_RETRIES` | no | `3` |

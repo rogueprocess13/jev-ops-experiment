@@ -1,6 +1,6 @@
 """Jev adapter. The only module that knows about Jev's HTTP API.
 
-API details are in docs/jev-api-notes.md (source: https://thejevai.com/docs).
+API details are in docs/jev-api-notes.md (source: https://docs.typesafe.ai/api).
 One request per decision, three typed questions:
   severity      -> choice
   action        -> choice
@@ -19,7 +19,7 @@ import requests
 
 from scenarios.definitions import ACTIONS, CAUSES, HUMAN_REVIEW, SEVERITIES
 
-DEFAULT_URL = "https://thejevai.com/v1/systemone"
+DEFAULT_URL = "https://api.typesafe.ai/v1/systemone"
 DEFAULT_MODEL = "jev-latest"
 PLACEHOLDER_KEY = "your-key-here"  # the value in .env.example
 HUMAN_REVIEW_THRESHOLD = 0.5
@@ -102,12 +102,12 @@ def load_config() -> JevConfig:
     if not key:
         raise ConfigError(
             "JEV_API_KEY is not set. Copy .env.example to .env and add your key "
-            "(get one at https://thejevai.com/settings/apikeys)."
+            "(get one at https://console.typesafe.ai/)."
         )
     if key == PLACEHOLDER_KEY:
         raise ConfigError(
             "JEV_API_KEY in .env is still the placeholder. Get a key at "
-            "https://thejevai.com/settings/apikeys"
+            "https://console.typesafe.ai/"
         )
     return JevConfig(
         api_key=key,

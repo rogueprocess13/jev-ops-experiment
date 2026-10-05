@@ -1,14 +1,16 @@
 # Jev API notes
 
-Consulted: 2026-09-29. Primary source: https://thejevai.com/docs. Cross-checked against the Pydantic AI TypeSafe page (https://pydantic.dev/docs/ai/models/typesafe/), which agrees on model names, `TYPESAFE_API_KEY`, and the choice/rubric/boolean question types.
+Consulted: 2026-09-29, corrected 2026-10-05. Primary source: TypeSafe's API reference, https://docs.typesafe.ai/api. Jev is TypeSafe's model. Cross-checked against the Pydantic AI TypeSafe page (https://pydantic.dev/docs/ai/models/typesafe/), which agrees on model names, `TYPESAFE_API_KEY`, and the choice/rubric/boolean question types.
 
-Not used: other sites found by search (blog posts, community sites, unofficial GitHub notes). One of them (jevai.org) describes a different endpoint (`/v1/decisions`) and does not match the official docs, so it was ignored.
+Correction (2026-10-05): the first version of these notes used https://thejevai.com/docs as the primary source. That site is not TypeSafe. Its footer says "Jev AI is an independently operated product and is not affiliated with, operated by, or endorsed by TypeSafe." A key from the TypeSafe console (`apikey_` prefix) gets `401 {"code":-1,"message":"Invalid API key."}` on `https://thejevai.com/v1/systemone` and works on `https://api.typesafe.ai/v1/systemone` (a fake key gets 401 there; the real key gets 200 with answers, model `jev-1.13.0`). The request and response shapes below matched in real runs on 2026-10-05. Details first taken from thejevai.com and not yet re-checked against docs.typesafe.ai are marked.
+
+Not used: other sites found by search (blog posts, community sites, unofficial GitHub notes). One of them (jevai.org) describes a different endpoint (`/v1/decisions`) and was ignored.
 
 ## Endpoint and auth
 
-- `POST https://thejevai.com/v1/systemone`
+- `POST https://api.typesafe.ai/v1/systemone`
 - `Authorization: Bearer <API_KEY>`, `Content-Type: application/json`
-- API keys: https://thejevai.com/settings/apikeys
+- API keys: https://console.typesafe.ai/
 - No official Python SDK was found in the docs. This project calls the HTTP API directly with `requests`. (Pydantic AI has a `TypeSafeModel`, but it adds a large dependency for no gain.)
 
 ## Request
@@ -43,7 +45,8 @@ Question types:
 - `usage.input_tokens`, `usage.output_tokens`: token counts.
 - `elapsedMs`: "time from sending the request to receiving the result, including validation". Not pure inference time. The docs do not say exactly where it sits, so the adapter reads it at the top level and falls back to `usage.elapsedMs`.
 - The docs say usage "may include cost in USD" but do not name the field. The adapter takes any numeric `usage` key containing "cost" as reported cost, and keeps the raw `usage` object.
-- Pricing (https://thejevai.com/pricing, checked 2026-09-30): credit packs only (Starter $10 = 100,000 credits, Pro $100 = 1,000,000, Enterprise $1,000 = 11,000,000). No per-token or per-request rate is published, so the project has no default price.
+- Pricing: TypeSafe's API reference (checked 2026-10-05) gives no per-token or per-request price, and real responses carry no cost field, so the project has no default price. (The credit packs at https://thejevai.com/pricing belong to that separate, unaffiliated site, not to TypeSafe.)
+- `elapsedMs` and the "may include cost" wording above come from thejevai.com and are not yet re-checked against docs.typesafe.ai. Real responses on 2026-10-05 had neither.
 - No request ID or rate-limit headers are documented.
 
 ## Errors
@@ -69,7 +72,7 @@ Overall confidence for a run: the mean of the `severity` and `action` choice con
 
 ## Configuration
 
-Environment variables: `JEV_API_KEY` (required), `JEV_API_URL` (default `https://thejevai.com/v1/systemone`), `JEV_MODEL` (default `jev-latest`), `JEV_TIMEOUT_S` (default 30), `JEV_MAX_RETRIES` (default 3).
+Environment variables: `JEV_API_KEY` (required), `JEV_API_URL` (default `https://api.typesafe.ai/v1/systemone`), `JEV_MODEL` (default `jev-latest`), `JEV_TIMEOUT_S` (default 30), `JEV_MAX_RETRIES` (default 3).
 
 The model version that answered is in the response `model` field. It is recorded per run, because `jev-latest` may change over time.
 

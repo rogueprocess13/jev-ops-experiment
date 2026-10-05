@@ -18,7 +18,7 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 - **All randomness comes from `random.Random(seed)`** inside the generator. Never use the global RNG. Logs are generated *after* metrics and services, so adding log kinds never changes a seed's metrics. Keep it that way.
 - **Log lines must not leak the answer.** No scenario names, and no wording that tells Jev what to do (`test_logs_do_not_leak_scenario_or_answer`).
 - **Secrets stay in `.env`** (git-ignored). Never log, store or commit `JEV_API_KEY`. `Decision` objects and result files must not contain it.
-- **All Jev HTTP and API code lives in `jev/client.py`** (transport, retries, usage telemetry; Tier 1 questions and parsing too). Tier 2's question set and answer parsing live in `tier2/jev_adapter.py`, which calls `JevClient.send`. Nothing else may import HTTP or API details. API facts are in `docs/jev-api-notes.md`. Check the current docs at https://thejevai.com/docs before changing request or response handling. Do not guess parameters.
+- **All Jev HTTP and API code lives in `jev/client.py`** (transport, retries, usage telemetry; Tier 1 questions and parsing too). Tier 2's question set and answer parsing live in `tier2/jev_adapter.py`, which calls `JevClient.send`. Nothing else may import HTTP or API details. API facts are in `docs/jev-api-notes.md`. Check the current docs at https://docs.typesafe.ai/api before changing request or response handling. Do not guess parameters.
 
 ## Tier 2 rules (OpenTelemetry Demo)
 
