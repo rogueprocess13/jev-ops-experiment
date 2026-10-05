@@ -87,7 +87,7 @@ All four batches started at the same time. The Jev and Claude batches finished w
 
 ## Source and how to repeat
 
-Figures come from `python report.py --compare` and `python report.py --metrics` on these run files (kept locally in `results/`, not in git):
+Figures come from `python report.py --compare` and `python report.py --metrics` on these run files, published with both reports in [sample-run-2026-10-05/](sample-run-2026-10-05/):
 
 - `20261005-224157-70runs.jsonl` (Jev)
 - `20261005-224548-70runs-claude-sonnet.jsonl`
