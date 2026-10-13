@@ -89,11 +89,11 @@
 
 ## 10. Live verification
 
-- [ ] 10.1 Run `./setup.sh` and `./health-check.sh` on a clean machine state and confirm the checks pass
-- [ ] 10.2 Run `F000` (healthy control) against real Jev, several times, and record the false-positive count
-- [ ] 10.3 Run one fault experiment against real Jev (the first scenario that passed task group 1)
-- [ ] 10.4 Open the stored Jev request payload from a real run and confirm it contains no flag, fault or ground-truth strings
-- [ ] 10.5 Confirm reset: the flag is `off` after the run and the target service is back within the baseline band
-- [ ] 10.6 Confirm the result file has the four verdicts, the raw response and a timing block with `null` where unmeasured
-- [ ] 10.7 Run the remaining scenarios and `./run-all-experiments --repeats 3`
-- [ ] 10.8 Write up the architecture, scenarios, observation format, evaluation method, example result, known limitations and the recommended next experiment
+- [x] 10.1 Run `./setup.sh` and `./health-check.sh` on a clean machine state and confirm the checks pass
+- [x] 10.2 Run `F000` (healthy control) against real Jev, several times, and record the false-positive count
+- [x] 10.3 Run one fault experiment against real Jev (the first scenario that passed task group 1)
+- [x] 10.4 Open the stored Jev request payload from a real run and confirm it contains no flag, fault or ground-truth strings
+- [x] 10.5 Confirm reset: the flag is `off` after the run and the target service is back within the baseline band
+- [x] 10.6 Confirm the result file has the four verdicts, the raw response and a timing block with `null` where unmeasured
+- [x] 10.7 Run the remaining scenarios and `./run-all-experiments --repeats 3`
+- [x] 10.8 Write up the architecture, scenarios, observation format, evaluation method, example result, known limitations and the recommended next experiment
