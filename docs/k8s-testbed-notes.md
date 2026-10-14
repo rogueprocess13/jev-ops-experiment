@@ -32,23 +32,63 @@ Per-run fields (`HarnessRun`) used by `python -m tier3 export-lfedge`: `run_id`,
 | `dependency_removal` | target replicas 0 | same, target `valkey-cart` |
 | `network_partition`, `kill_pod` | deny-ingress NetworkPolicy; delete the target's pods | same; policy named `jev-fault-np` |
 
-## Pinned versions (tasks 1.2-1.4, not yet verified)
+## Host (task 1.1, 2026-10-14)
 
-| Component | Pin | Status |
+30 GB RAM, about 9.2 GB available with the owner's other work running; 16 cores, load about 1.2; NVMe SSD, 359 GB free; Docker 29.8.2; Tier 2 stopped. Swap is zram (compressed RAM), so memory pressure costs CPU, not disk. The pre-check was lowered from 12 to 8 GB after trimming the demo (below); the measured footprint is recorded under task 1.4.
+
+## Pinned versions (tasks 1.2-1.4)
+
+| Component | Pin | Verified |
 |---|---|---|
-| kind | `v0.29.0` | to confirm on install |
-| node image | `kindest/node:v1.33.1` | to confirm, record the digest |
-| CNI | kindnet (`CNI=kindnet`) | **to verify**: does kindnet enforce NetworkPolicy? If not, `CNI=calico` with Calico `v3.29.3` |
-| Demo chart | the `open-telemetry/opentelemetry-demo` release with `appVersion` 3.1.0 | `install.sh` resolves and records it; pin it in `pins.env` afterwards |
+| kind | `v0.29.0` | installed to `~/.local/bin`, SHA-256 checked against the release file (2026-10-14). Newer releases exist (v0.33.0); kept the pin |
+| node image | `kindest/node:v1.33.1@sha256:0500722...b34f` | the default image listed in the v0.29.0 release notes |
+| kubectl | `v1.33.1` | from dl.k8s.io, SHA-256 checked |
+| helm | `v3.22.0` | from get.helm.sh, SHA-256 checked (Helm 4 exists; v3 kept) |
+| CNI | kindnet (kind default) | **enforces NetworkPolicy** (task 1.3): kind has shipped `kube-network-policies` since v0.24.0 |
+| Demo chart | `open-telemetry/opentelemetry-demo` `0.42.4` (app 3.1.0) | 0.42.0-0.42.4 all carry app 3.1.0; newest taken |
 
-## Chart facts the code assumes (task 1.4, not yet verified)
+## NetworkPolicy check (task 1.3, 2026-10-14)
 
-- Each demo service is a Deployment named after the service (`cart`, `valkey-cart`, `load-generator`, ...). `python -m tier3 health` fails with "missing deployments" if not.
-- Pods carry `opentelemetry.io/name: <service>`; `nodeports.yaml` and the pod-to-service mapping rely on it (`app.kubernetes.io/component` and `app.kubernetes.io/name` are fallbacks).
-- Placement keys in `values/demo.yaml`: `default.schedulingRules.nodeSelector`, `components.<name>.schedulingRules.nodeSelector`, and the subcharts' own `nodeSelector` keys (`opentelemetry-collector`, `jaeger`, `prometheus.server`, `grafana`, `opensearch`). Check placement after install.
-- Prometheus server pods: `app.kubernetes.io/name=prometheus, app.kubernetes.io/component=server`; OpenSearch pods: `app.kubernetes.io/name=opensearch`.
-- Infrastructure deployments hidden from the engine are matched by name prefix (`INFRA_PREFIXES` in `tier3/collectors/kube.py`). Check the list against the real deployment names.
-- Span metrics, Jaeger and OpenSearch field names as in Tier 2 (`docs/otel-demo-notes.md`), now reached through the NodePorts.
+busybox `httpd` pod on jev-worker2, client on jev-worker3. Before: `wget` gets the page. With a deny-all ingress policy on the server: `wget: download timed out` (packets dropped, not refused). After deleting the policy: the page again. So `network_partition` makes calls to the target **time out**; callers should show latency and timeouts rather than immediate connection errors.
+
+## Chart facts (task 1.4, checked with `helm template` before install)
+
+- Every demo service is a Deployment named after it (`cart`, `valkey-cart`, `load-generator`, ...). Pods carry `opentelemetry.io/name`, `app.kubernetes.io/component` and `app.kubernetes.io/name` all equal to the service name.
+- Subchart pods carry only `app.kubernetes.io/name` and `/component`, with component values such as `server` (Prometheus) and `all-in-one` (Jaeger). The pod-to-service mapping therefore reads `opentelemetry.io/name` first (fixed 2026-10-14; it read `component` first).
+- The collector is a DaemonSet `otel-collector-agent` (presets: hostMetrics, kubeletMetrics, kubernetesAttributes, clusterMetrics). It is pinned to `jev-worker`; applications reach it through its Service, so it does not need a pod per node.
+- Placement keys: `default.schedulingRules.nodeSelector`, `components.<name>.schedulingRules.nodeSelector`, `opentelemetry-collector.nodeSelector`, `jaeger.jaeger.nodeSelector` (Jaeger chart 4.13.1), `prometheus.server.nodeSelector`, `opensearch.nodeSelector`. The render puts every application Deployment on `jev-role=app` and `jaeger`, `prometheus`, `opensearch`, the collector, `flagd`, `load-generator` and `opamp-server` on `jev-role=observability`.
+- Host NodePorts: `frontend-proxy` pods (`opentelemetry.io/name=frontend-proxy`, port 8080), Prometheus (`app.kubernetes.io/name=prometheus, component=server`, 9090), OpenSearch (`app.kubernetes.io/name=opensearch`, 9200). The selectors in `nodeports.yaml` match.
+- Demo 3.1.0 in the chart adds `agent`, `chatbot`, `mcp` (LLM assistant), `astronomy-db` (Postgres for product-catalog), `opamp-server` and `telemetry-docs`.
+
+### Trimmed for memory
+
+Disabled in `values/demo.yaml`: `kafka`, `accounting` and `fraud-detection` (Kafka consumers), `agent`, `chatbot`, `mcp` (also not run in Tier 2: they live in `compose.agent.yaml`), `telemetry-docs` and Grafana. About 3 GB of memory limits. None is on the path of any Tier 3 scenario. `checkout` publishes to Kafka only when `KAFKA_ADDR` is set (`src/checkout/main.go`), so its `KAFKA_ADDR` is overridden to empty and its `wait-for-kafka` init container removed. Kept: `astronomy-db` and `opamp-server` (product-catalog depends on both).
+
+Tier 3 therefore has its own service list (`tier3/vocab.py`, 15 services): not Tier 2's, which has `kafka`, `accounting`, `fraud-detection` and `postgresql`.
+
+## Install and measured footprint (task 1.4, 2026-10-14)
+
+`install.sh` with chart 0.42.4 took about 5 minutes (image pulls inside the kind nodes). Placement after install matched the render: every application pod on jev-worker2 or jev-worker3, every observability, flag, load and OpAMP pod on jev-worker, nothing on the control plane. `python -m tier3 health`: all eight checks ok.
+
+Problems found and fixed in `values/demo.yaml`:
+
+1. `ad` (Java) was OOMKilled 5 times in its first 5 minutes with the chart's 300Mi limit. Raised to 500Mi; no restart since.
+2. **No application telemetry arrived.** Span metrics had only `flagd` and `frontend-web`, both on jev-worker. The collector is a DaemonSet, and in daemonset mode the chart gives its Service `internalTrafficPolicy: Local`. Pinned to jev-worker it has no pod on the application nodes, so their spans, metrics and logs were dropped. Set `opentelemetry-collector.service.internalTrafficPolicy: Cluster`; afterwards Jaeger lists every application service and span metrics cover the services under load.
+3. The collector logged errors every few seconds (kafkametrics without Kafka; kubeletstats TLS on kind; DNS for the disabled firepit) and ships its own logs to OpenSearch as service `otelcol-contrib`: 461 warn/error lines in 5 minutes, which would have topped every observation's `error_logs`. Removed the kafkametrics receiver and the kubeletMetrics preset, and `tier3/collect.py` now drops `otelcol-contrib`, `jaeger` (self-traces) and `opamp-server` from logs, traces, edges and service stats. The firepit DNS warning remains in the collector's own logs only.
+
+Baseline after the fixes, 10 users: span metrics for ad, cart, currency, frontend, frontend-proxy, image-provider, product-catalog, quote, recommendation and shipping (checkout, payment and email appear when orders are placed), all with error rate 0.000; frontend about 11 req/s, p95 about 37 ms.
+
+Measured after settling (`docker stats`, 17:51):
+
+| Node | Memory | CPU |
+|---|---|---|
+| jev-control-plane | 774 MiB | 10% of a core |
+| jev-worker (observability, load) | 2.5 GiB | 16% |
+| jev-worker2 (app) | 888 MiB | 8% |
+| jev-worker3 (app) | 598 MiB | 15% |
+| **total** | **about 4.7 GiB** | **about half a core** |
+
+Startup peaked at load average 8.2 (16 cores) for a few minutes. Docker volumes grew by about 11 GB (images stored inside the kind nodes). The 8 GB pre-check leaves about 3 GB of headroom.
 
 ## Fault behaviour on the cluster (tasks 1.6-1.9, open)
 

@@ -103,7 +103,7 @@ Same endpoint and question types through `JevClient.send` and `tier3/jev_adapter
 | Question | Type | Notes |
 |---|---|---|
 | `incident_detected` | `noul` | P(yes); incident if >= 0.5, as in Tier 2. |
-| `affected_component` | `choice` | 23 options: `none`, the 18 demo services, the four kind node names. |
+| `affected_component` | `choice` | 20 options: `none`, the 15 demo services deployed in Tier 3, the four kind node names. |
 | `diagnosis` | `choice` | 12 options (`tier3/vocab.py`). |
 | `recommended_action` | `choice` | 6 options, as in Tier 2. |
 

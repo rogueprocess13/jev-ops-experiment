@@ -1,9 +1,9 @@
 ## 1. Verify the platform and every fault before coding against them
 
-- [ ] 1.1 Free host memory and stop Tier 2; record available RAM and Docker version (spec: k8s-testbed pre-check)
-- [ ] 1.2 Install pinned `kind`, `kubectl` and `helm`; record versions
-- [ ] 1.3 By hand, create the four-node `jev` cluster with role labels and NodePort mappings; confirm whether the default CNI enforces NetworkPolicy, else recreate with pinned Calico (design D4)
-- [ ] 1.4 Find the demo chart release whose `appVersion` is 3.1.0; install it with node selectors and NodePorts; confirm placement and measured memory; confirm Prometheus, Jaeger, OpenSearch and Locust are reachable from the host
+- [x] 1.1 Free host memory and stop Tier 2; record available RAM and Docker version (spec: k8s-testbed pre-check)
+- [x] 1.2 Install pinned `kind`, `kubectl` and `helm`; record versions
+- [x] 1.3 By hand, create the four-node `jev` cluster with role labels and NodePort mappings; confirm whether the default CNI enforces NetworkPolicy, else recreate with pinned Calico (design D4)
+- [x] 1.4 Find the demo chart release whose `appVersion` is 3.1.0; install it with node selectors and NodePorts; confirm placement and measured memory; confirm Prometheus, Jaeger, OpenSearch and Locust are reachable from the host
 - [x] 1.5 Read the LF Edge harness (`lfedgeai/AIOps`, `research/agentic_aiops_architectures`) for its per-run JSON field names, its poll cadence and detection window, and record them for the export and D11 defaults
 - [ ] 1.6 Run each of the ten faults by hand on `cart` (and `valkey-cart`, `jev-worker2`); for each, record what shows in span metrics, Jaeger, OpenSearch, deployments, pods, nodes and events, how long it takes, and that exact restore works
 - [ ] 1.7 Settle the rolling-update question for `memory_limit`, `readiness_probe_fail` and `config_corruption`: does the old pod keep serving? Decide each scenario's `incident` ground truth with a rationale

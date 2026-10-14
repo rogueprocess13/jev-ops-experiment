@@ -136,3 +136,15 @@ def test_health_check_reports_missing_deployments(tmp_path):
                                 os_url="http://x", get=lambda u: (200, b"{}"))
     dep = next(c for c in checks if c.name == "deployments")
     assert not dep.ok and "valkey-cart" in dep.detail
+
+
+def test_subchart_pods_map_to_infra_not_to_their_component_label():
+    prom = {"metadata": {"name": "prometheus-6f7d-abcde",
+                         "labels": {"app.kubernetes.io/name": "prometheus",
+                                    "app.kubernetes.io/component": "server"}},
+            "spec": {"nodeName": "jev-worker"}, "status": {"phase": "Running"}}
+    cart = {"metadata": {"name": "cart-1", "labels": {"opentelemetry.io/name": "cart",
+                                                      "app.kubernetes.io/component": "cart"}},
+            "spec": {}, "status": {"phase": "Running"}}
+    assert [r["service"] for r in pod_rows([prom, cart])] == ["cart"]
+    assert is_infra("opamp-server") and is_infra("otel-collector-agent")

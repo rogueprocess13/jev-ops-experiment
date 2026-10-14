@@ -148,3 +148,16 @@ def test_observation_module_does_not_import_scenarios_or_faults():
                 imported.update(a.name for a in n.names)
         assert not any(m.startswith(("tier3.scenarios", "tier3.faults", "tier2.scenarios"))
                        for m in imported), mod.__name__
+
+
+def test_collector_and_jaeger_self_telemetry_dropped():
+    from tier3.collect import without_infra
+    t = telemetry(True)
+    t.services["otelcol-contrib"] = ServiceStats(1, 0.9, 1, 1)
+    t.logs.append({"ts": "t", "service": "otelcol-contrib", "level": "WARN", "message": "unable to open connection to broker"})
+    t.edges.append({"from": "jaeger", "to": "frontend", "calls": 1, "errors": 0})
+    t.traces.append({"trace_id": "x", "path": ["jaeger"], "duration_ms": 1,
+                     "failed_spans": [{"service": "jaeger", "operation": "q", "error": "e"}]})
+    text = json.dumps(build_observation(without_infra(t), KubeState())[0])
+    assert "otelcol-contrib" not in text and "broker" not in text and "jaeger" not in text
+    assert "checkout" in text  # application evidence kept

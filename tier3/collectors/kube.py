@@ -27,13 +27,15 @@ JSON_PATCH = "application/json-patch+json"
 # Deployments that are harness, load or observability infrastructure, not part of
 # the application the engine reasons about. Matched as name prefixes because the
 # chart's subcharts add suffixes (prometheus-server, jaeger-all-in-one, ...).
-INFRA_PREFIXES = ("load-generator", "flagd", "otel-collector", "opentelemetry-collector",
+INFRA_PREFIXES = ("load-generator", "flagd", "opamp-server", "otel-collector", "opentelemetry-collector",
                   "jaeger", "prometheus", "grafana", "opensearch", "telemetry-docs")
 # Namespaces never shown to the engine (design D10).
 EXCLUDED_NAMESPACES = frozenset({"kube-system", "kube-public", "kube-node-lease",
                                  "local-path-storage", "calico-system", "tigera-operator",
                                  "calico-apiserver"})
-SERVICE_LABELS = ("app.kubernetes.io/component", "opentelemetry.io/name", "app.kubernetes.io/name")
+# The demo's own label first: subchart pods set app.kubernetes.io/component to
+# values like "server" (prometheus) or "all-in-one" (jaeger).
+SERVICE_LABELS = ("opentelemetry.io/name", "app.kubernetes.io/name", "app.kubernetes.io/component")
 PRESSURE_CONDITIONS = ("MemoryPressure", "DiskPressure", "PIDPressure", "NetworkUnavailable")
 
 

@@ -1,8 +1,6 @@
 """Tier 3 vocabularies. Separate from Tier 1 and Tier 2 on purpose (design D8)."""
 from __future__ import annotations
 
-from tier2.vocab import SERVICES as _DEMO_SERVICES
-
 # The LF Edge harness's ten Kubernetes fault types, spelled as in their
 # code/harness/run_harness.py (inject_k8s_fault).
 FAULT_TYPES = (
@@ -48,9 +46,27 @@ OBSERVABILITY_NODE = "jev-worker"
 APP_NODES = ("jev-worker2", "jev-worker3")
 NODES = (CONTROL_PLANE, OBSERVABILITY_NODE, *APP_NODES)
 
-# Demo application and data services, the same list as Tier 2. Each is a
-# deployment of the same name in the demo namespace (checked in task 1.4).
-SERVICES = _DEMO_SERVICES
+# Demo application and data services deployed by chart 0.42.4 with
+# tier3/testbed/values/demo.yaml, each a Deployment of the same name (checked with
+# `helm template` on 2026-10-14). Not Tier 2's list: Kafka, accounting and
+# fraud-detection are not deployed, and the chart's Postgres is astronomy-db.
+SERVICES = (
+    "ad",
+    "astronomy-db",
+    "cart",
+    "checkout",
+    "currency",
+    "email",
+    "frontend",
+    "frontend-proxy",
+    "image-provider",
+    "payment",
+    "product-catalog",
+    "quote",
+    "recommendation",
+    "shipping",
+    "valkey-cart",
+)
 
 NO_COMPONENT = "none"
 # Components the engine may name as affected. The same list in every run.
