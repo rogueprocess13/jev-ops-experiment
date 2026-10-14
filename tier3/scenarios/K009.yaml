@@ -1,0 +1,25 @@
+experiment_id: K009
+application: otel-demo-3.1.0-kind
+description: application worker jev-worker2 tainted NoExecute
+rationale: >
+  Every application pod on jev-worker2 is evicted and rescheduled on jev-worker3. Services
+  restart, errors spike briefly, and the node shows a NoExecute taint. The origin is the node,
+  not any one service; the failure mode is eviction. Changing a node needs a human, so
+  investigate and escalate are acceptable. Which services land on jev-worker2 is recorded per
+  run as placement.
+fault:
+  type: node_taint
+  target: jev-worker2
+target_component: jev-worker2
+duration_s: 240
+detection_window_s: 240
+poll_interval_s: 15
+observation_window_s: 180
+baseline_window_s: 180
+workload:
+  users: 10
+expected:
+  incident: true
+  affected_component: jev-worker2
+  diagnosis: node_eviction
+  acceptable_actions: [investigate, escalate]

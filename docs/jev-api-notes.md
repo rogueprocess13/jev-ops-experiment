@@ -95,3 +95,16 @@ Tier 2 reuses the same endpoint and question types through `JevClient.send` (tra
 - Overall confidence is the mean of the three choice confidences when present, else `null`. The noul probability is stored separately in the raw response.
 - Jev's reply has no free-text reasoning field in the docs checked, so `reasoning` is `null` unless a `reasoning` string appears in the body. The raw response is always stored.
 - **Size.** The 32k-token limit above comes from the Pydantic AI page, not from the Jev API docs, so it is unverified for this endpoint. A real observation can be large, so the builder caps it at 60,000 bytes (about 15k tokens at roughly 4 bytes per token) before the questions are added. If real runs show Jev rejecting requests, lower `BYTE_BUDGET` in `tier2/observation.py` and record the finding.
+
+## Tier 3 use (Kubernetes faults on kind)
+
+Same endpoint and question types through `JevClient.send` and `tier3/jev_adapter.py`. No new API features.
+
+| Question | Type | Notes |
+|---|---|---|
+| `incident_detected` | `noul` | P(yes); incident if >= 0.5, as in Tier 2. |
+| `affected_component` | `choice` | 23 options: `none`, the 18 demo services, the four kind node names. |
+| `diagnosis` | `choice` | 12 options (`tier3/vocab.py`). |
+| `recommended_action` | `choice` | 6 options, as in Tier 2. |
+
+In `poll` mode one run makes one request per poll (up to 16 with the default 240 s window and 15 s interval), each with a fresh observation and the identical question set. Every request and raw response is stored in the run record. The observation keeps Tier 2's 60,000-byte budget.

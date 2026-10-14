@@ -8,17 +8,17 @@ Prepared for discussion in the LF Edge AIOps forum.
 
 [![tests](https://github.com/rogueprocess13/jev-ops-experiment/actions/workflows/tests.yml/badge.svg)](https://github.com/rogueprocess13/jev-ops-experiment/actions/workflows/tests.yml)
 
-## Two tiers
+## Three tiers
 
-| | Tier 1: synthetic | Tier 2: OpenTelemetry Demo |
-|---|---|---|
-| Input | Seeded random server statistics | Real metrics, logs and traces from a running distributed application |
-| Tests | Basic decision reasoning | AIOps reasoning against realistic telemetry |
-| Ground truth | Hand-written expected decision per scenario | The fault the harness injected, hidden from Jev |
-| Infrastructure | None (Python only) | Docker Compose |
-| Run with | `./run-all.sh` (this page, below) | `./run-experiment F001` ([Tier 2](#tier-2-opentelemetry-demo)) |
+| | Tier 1: synthetic | Tier 2: OpenTelemetry Demo | Tier 3: Kubernetes faults |
+|---|---|---|---|
+| Input | Seeded random server statistics | Real metrics, logs and traces from a running distributed application | Tier 2's telemetry plus Kubernetes state (deployments, pods, nodes, events) |
+| Tests | Basic decision reasoning | AIOps reasoning against realistic telemetry | The LF Edge AIOps group's fault catalogue, with time-to-detect and false alarms |
+| Ground truth | Hand-written expected decision per scenario | The fault the harness injected, hidden from Jev | The same, for Kubernetes API faults |
+| Infrastructure | None (Python only) | Docker Compose | A local four-node kind cluster |
+| Run with | `./run-all.sh` (this page, below) | `./run-experiment F001` ([Tier 2](#tier-2-opentelemetry-demo)) | `./run-k8s-experiment K001` ([Tier 3](#tier-3-kubernetes-faults-on-kind)) |
 
-The two tiers share only the Jev client (`jev/client.py`). Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tier 2 has its own section.
+The tiers share only the Jev client (`jev/client.py`); Tier 3 also reuses Tier 2's collectors and scrubber. Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tiers 2 and 3 have their own sections.
 
 ## Quick start
 
@@ -398,6 +398,85 @@ pytest
 
 The tests need no network and no API key. They cover scenario definitions, generation, seeds, comparison and aggregation, using a fake Jev client. They do not check what real Jev answers, because that is what the experiment measures.
 
+## Tier 3: Kubernetes faults on kind
+
+> Status: code and offline tests are written. The cluster facts (kind and chart versions, NetworkPolicy enforcement, chart value keys) and the behaviour of every fault are **not yet verified on a real cluster** (task group 1 in `openspec/changes/k8s-faults-tier3/tasks.md`), and no live run exists yet. Expected outcomes are provisional until then.
+
+### Why it exists
+
+The [LF Edge AIOps group](https://github.com/lfedgeai/AIOps) (`research/agentic_aiops_architectures`) tests agents against Kubernetes API faults on the OpenTelemetry Demo, polls them to measure time-to-detect (MTTD), and reports detect, RCA, remediation and MTTD. Tier 2's flagd faults and single decision could not be compared with that. Tier 3 runs Jev against the group's ten fault types, with their names and their target (`cart`), and reports in their terms.
+
+### What is and is not comparable with the group's results
+
+| | LF Edge harness | Tier 3 |
+|---|---|---|
+| Faults | ten Kubernetes API faults | the same ten, same names, exact restore, no self-naming markers |
+| Agent | tool-calling loop that gathers evidence and can act | Jev answers four fixed questions from an observation the harness builds |
+| Polling | default every 15 s, first poll after 15 s | the same defaults |
+| Detect, RCA, remediation correct, MTTD | measured | measured (RCA = our localization verdict; remediation correct = our action verdict) |
+| Remediation executed, MTTR, recovery verified | measured | not measured: the harness never acts on Jev's recommendation |
+| Healthy control | a skip-injection mode exists, false alarms are not scored | `K000`, every poll scored for false alarms, detection precision reported |
+
+Compare only detect, RCA, remediation correct and MTTD, and say that Jev did not gather its own evidence.
+
+### Scenarios
+
+| ID | Fault | Target | Expected component | Expected diagnosis | Acceptable actions |
+|---|---|---|---|---|---|
+| K000 | none (healthy control) | none | none | none | no_action |
+| K001 | scale_zero | cart | cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
+| K002 | kill_pod | cart | cart | pod_restart | no_action, investigate |
+| K003 | memory_limit | cart | cart | oom_killed | rollback_change, investigate, escalate |
+| K004 | network_partition | cart | cart | network_blocked | rollback_change, investigate, escalate |
+| K005 | readiness_probe_fail | cart | cart | readiness_failure | rollback_change, investigate, escalate |
+| K006 | config_corruption | cart | cart | misconfiguration | rollback_change, investigate, escalate |
+| K007 | dependency_removal | valkey-cart | valkey-cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
+| K008 | replica_overload | cart | cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
+| K009 | node_taint | jev-worker2 | jev-worker2 | node_eviction | investigate, escalate |
+| K010 | pvc_full | cart | cart | disk_full | investigate, escalate |
+
+Each file in `tier3/scenarios/` has the rationale. Three groups are expected to change after task group 1: the rolling-update faults (K003, K005, K006) may not affect users while the old pod keeps serving; `config_corruption` may do nothing on cart, which is thought to read `VALKEY_ADDR`, not `DATABASE_HOST`; K002 and K010 may leave no visible symptom.
+
+### How a run works
+
+Pre-check, baseline (service stats, cluster state, pod placement), arm a dead-man timer, save state to `results/tier3/.active-fault.json`, inject and read back, wait 15 s, then ask Jev every 15 s with a fresh observation until it reports an incident or 240 s have passed. The first detecting poll is scored and gives MTTD. Then reset (always, in `finally`), disarm the timer, and wait until every deployment, node and service is back at baseline; otherwise the run is `contaminated` and the batch stops.
+
+Jev is asked `incident_detected` (yes/no), `affected_component` (a demo service or one of the four node names), `diagnosis` and `recommended_action`. The observation adds `deployments` (desired, ready, available, rollout state vs baseline), `pods` (only unhealthy, restarted or new ones), `nodes` (Ready, pressure, schedulable, taint effects without keys) and Warning `events` to Tier 2's `services`, `dependencies`, `error_logs` and `failing_traces`. It never contains pod specs, environment variables, resource limits or NetworkPolicy objects: those would show the change, not its effect.
+
+### Host requirements
+
+Docker, [kind](https://kind.sigs.k8s.io/), `kubectl` and `helm`, and 12 GB of free memory (kind nodes share host memory). Tier 2 must be stopped first. Versions are pinned in `tier3/testbed/pins.env`.
+
+### Commands
+
+```bash
+./setup-k8s.sh                          # pre-check, kind cluster, demo chart, health check
+./health-check-k8s.sh
+./run-k8s-experiment list
+./run-k8s-experiment K001               # one run, polling (add --mode single for one call)
+./run-all-k8s-experiments --repeats 3   # the whole catalogue
+./run-all-k8s-experiments K000 --repeats 10   # extra healthy-control runs for the false-alarm rate
+python -m tier3 scorecard results/tier3/<run-id>
+python -m tier3 export-lfedge results/tier3/<run-id> -o lfedge.jsonl
+python -m tier3 export-reasoning results/tier3/<run-id> -o reasoning.md
+python -m tier3 reset-faults            # restore from the ledger, remove every jev-fault object
+tier3/testbed/stop.sh | start.sh | delete.sh
+```
+
+A polling run makes up to 16 Jev calls (one per poll). The scorecard shows counts with denominators, never bare percentages.
+
+### Environment variables
+
+| Variable | Default |
+|---|---|
+| `TIER3_KUBECONFIG` | `tier3/testbed/kubeconfig` (written by `create.sh`) |
+| `TIER3_NAMESPACE` | `otel-demo` |
+| `TIER3_BASE_URL` | `http://localhost:18080` (frontend-proxy: frontend, `/jaeger`, `/loadgen`) |
+| `TIER3_PROMETHEUS_URL` | `http://localhost:19090` |
+| `TIER3_OPENSEARCH_URL` | `http://localhost:19200` |
+
+Notes on the testbed, the verified facts and every dropped scenario are in `docs/k8s-testbed-notes.md`.
+
 ## Docker (optional)
 
 No Python needed on your machine:
@@ -441,6 +520,7 @@ jev/client.py             Jev adapter (the only Jev-specific code)
 llm/                      baseline engines: Claude (API or claude CLI), Ollama
 evaluation/evaluator.py   comparison, aggregation, summary text
 tests/                    offline unit tests
+tier2/ tier3/             Tiers 2 and 3 (see their sections and CLAUDE.md)
 docs/jev-api-notes.md     Jev API notes
 docs/llm-baseline-notes.md API notes for the baseline engines
 docs/results-2026-10-05-tier1-baselines.md  first four-engine comparison, with test machine

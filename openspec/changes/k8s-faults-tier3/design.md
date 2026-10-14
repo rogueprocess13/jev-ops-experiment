@@ -7,13 +7,15 @@ Tier 2 (change `otel-demo-tier2`) runs the OpenTelemetry Demo 3.1.0 on Docker Co
 3. Agents are tool-calling loops that query telemetry and the Kubernetes API themselves, and execute fixes. Remediation executed, MTTR and recovery verified are headline metrics.
 4. Matrices are large (288 to 336 runs). Their latest uses `scale_zero`, `config_corruption` and `kill_pod` on `cart`. Ground truth is the fault's target component (`config/fault_ground_truth.yaml`), and RCA is scored by finding the component name in the agent's text.
 
-Their harness has no healthy-control runs, so it cannot measure false positives or detection precision, which their own RFP scorecard (`test_harness/README.md`: MTTD precision vs recall, RCA accuracy, action fidelity, cost-to-resolve) asks for.
+Their harness can run without injection (`--skip-fault-injection`), but it does not score false alarms, so it reports no false-positive rate or detection precision, which their own RFP scorecard (`test_harness/README.md`: MTTD precision vs recall, RCA accuracy, action fidelity, cost-to-resolve) asks for.
 
 Their fault code has details we deliberately do not copy: `config_corruption` also sets `HARNESS_INJECTED_FAULT=config_corruption` on the container, which names the fault; the NetworkPolicy and taint are named `harness-*`; recovery sets replicas to 1 rather than the previous count; `node_taint` taints the first listed node, which can be the control plane.
 
 Jev is a classifier with `choice`, `score` and `noul` questions (`docs/jev-api-notes.md`). It cannot call tools or act. It fits the group's "Reasoning" slot only.
 
 Host facts (2026-10-13): 30 GB RAM, 16 cores, Docker 29.8.2. `kind`, `kubectl` and `helm` are not installed.
+
+Read from their harness on 2026-10-14 (`docs/k8s-testbed-notes.md`): poll every 15 s after a 15 s wait, fault held 90 s by default, MTTD from injection to the first alert, per-run fields in `HarnessRun`. Their `memory_limit`, `readiness_probe_fail` and `config_corruption` change every container; `pvc_full` ignores a failed write (`|| true`); `node_taint` replaces the node's whole taint list.
 
 Facts about kind, kindnet, the demo chart and the fault behaviour below are not yet verified against pinned versions. Task group 1 verifies each before code depends on it.
 
@@ -48,17 +50,19 @@ Facts about kind, kindnet, the demo chart and the fault behaviour below are not 
 | Fault | Inject | Saved and restored |
 |---|---|---|
 | `scale_zero` | target replicas to 0 | previous replica count |
-| `kill_pod` | delete the target's pods | nothing; recovery waits for new pods |
-| `memory_limit` | set every container's memory limit to `10Mi` | the deployment's pod template |
-| `network_partition` | NetworkPolicy `jev-fault-<run>` denying all ingress to the target pods | delete the policy |
+| `kill_pod` | delete the target's pods | the deleted pod names; recovery waits for new pods |
+| `memory_limit` | set every container's memory limit to `10Mi` (and a memory request, if set, to the same, or the API server rejects it) | the deployment's pod template |
+| `network_partition` | NetworkPolicy `jev-fault-np` denying all ingress to the target pods | delete the policy |
 | `readiness_probe_fail` | readiness probe `exec: false`, period 5 s, threshold 1 | the pod template |
 | `config_corruption` | add `DATABASE_HOST=invalid-host-that-does-not-exist.local` | the pod template |
 | `dependency_removal` | a backing service's replicas to 0 | previous replica count |
 | `replica_overload` | target replicas to 0 and load generator replicas to 3 | both previous counts |
 | `node_taint` | taint an application worker `jev-fault=true:NoExecute` | remove that taint only |
-| `pvc_full` | write 500 MB to `/tmp/jev-fault-fill` in one target pod | remove the file |
+| `pvc_full` | write 500 MB to `/tmp/jev-fault-fill` in one target pod (via `kubectl exec`; a failed write fails the inject) | remove the file |
 
-Unlike the group's code, no fault adds a label or variable that names itself. Harness objects use the `jev-fault` prefix, which the scrubber removes. The Kubernetes client is thin HTTP with `requests` (as in Tier 2's collectors), not the `kubernetes` package.
+Unlike the group's code, no fault adds a label or variable that names itself. Harness objects use the `jev-fault` prefix, which the scrubber removes. The Kubernetes client is thin HTTP with `requests`, not the `kubernetes` package. Pod exec needs a streaming protocol, so `pvc_full` uses `kubectl exec` with the same kubeconfig.
+
+Host NodePorts are our own Services (`tier3/testbed/nodeports.yaml`) selecting the chart's pods, so the chart's service values are not needed. A pod is listed in the observation when it is new since the baseline as well as when it is unhealthy or restarted, so a replaced pod (kill_pod, node_taint) is visible as an effect.
 
 **D6. Revert without the harness.** Before inject, the harness writes the saved state to `results/tier3/.active-fault.json`, and arms a host timer (`systemd-run --user --on-active=<duration + 120 s> python -m tier3 reset-faults`). If the harness dies, the timer restores the cluster from the ledger. `python -m tier3 reset-faults` is idempotent: it restores from the ledger if present, deletes every `jev-fault-*` NetworkPolicy, removes every `jev-fault` taint, and reports what it changed. The health check refuses to start while a ledger or harness object exists.
 
@@ -100,7 +104,7 @@ And the Tier 2 sections: `services`, `dependencies`, `error_logs`, `failing_trac
 
 **D10. Scrubber and leak test.** The builder takes only collector output and scrub terms, as in Tier 2. Additions: drop the `kube-system`, `local-path-storage` and any CNI namespace from pods and events; replace `jev-fault` and taint keys in all text; scrub the experiment ID. Evidence is kept: event reasons (`OOMKilling`, `BackOff`, `Unhealthy`, `FailedScheduling`, `TaintManagerEviction`), replica counts, node names. The leak test runs every scenario through the whole path with fixtures that contain every scrub term, including events captured from the real cluster in task 1, and asserts nothing leaks and the question set is identical across scenarios.
 
-**D11. Polling detection.** In the default `poll` mode the runner waits `telemetry_lag_s` (default 15 s, as in the group's harness) after inject, then every `poll_interval_s` (default 30 s) builds a fresh observation (window ending now) and asks Jev. The first poll with `incident_detected = true` sets `t_detect`, and that poll's decision is the one scored. If no poll detects before `detection_window_s` ends, the last poll's decision is scored and `t_detect` is `null`. For `K000`, polling runs for the whole window; every poll that reports an incident is a false-positive poll, and the run is a false-positive run if any poll does. `single` mode keeps the Tier 2 behaviour (one call after the duration) for comparison. The number of Jev calls, and tokens and cost where reported, are recorded per run.
+**D11. Polling detection.** In the default `poll` mode the runner waits `telemetry_lag_s` (default 15 s, as in the group's harness) after inject, then every `poll_interval_s` (15 s, the group's default `--poll-interval`; read 2026-10-14) builds a fresh observation (window ending now) and asks Jev. The first poll with `incident_detected = true` sets `t_detect`, and that poll's decision is the one scored. If no poll detects before `detection_window_s` ends, the last poll's decision is scored and `t_detect` is `null`. For `K000`, polling runs for the whole window; every poll that reports an incident is a false-positive poll, and the run is a false-positive run if any poll does. `single` mode keeps the Tier 2 behaviour (one call after the duration) for comparison. The number of Jev calls, and tokens and cost where reported, are recorded per run.
 
 **D12. Scorecard and export.** `python -m tier3 scorecard <results dir>` prints, per scenario and overall: detect (fault runs detected / fault runs), RCA (localization PASS), diagnosis PASS, remediation correct (action PASS), MTTD median and range over detected runs, false-positive runs and polls on `K000`, detection precision (detected fault runs / (detected fault runs + false-positive control runs)), agent errors, Jev calls, tokens and cost. Remediation executed, MTTR and recovery verified are printed as "not measured (recommendation only)". `python -m tier3 export-lfedge <results dir>` writes JSONL using the group's per-run field names (`detected`, `rca_correct`, `remediation_correct`, `mttd_seconds`, fault flag and variant, agent, `agent_error`, null for the unmeasured fields). Field names are checked against their harness code in task 1. Our four verdicts remain the primary result; the export is a mapping, and a count over small N is never shown as a bare percentage.
 
@@ -138,4 +142,4 @@ And the Tier 2 sections: `services`, `dependencies`, `error_logs`, `failing_trac
 - Should the harness ever carry out Jev's chosen remediation (fixed mapping, Kubernetes faults only) so MTTR and recovery can be reported? Not in this change; it needs a policy decision.
 - Does the group want our results in their MLflow? Ask at their weekly sync; the JSONL export keeps that option open.
 - Which scenarios survive task 1 (D7), and what ground truth do the rolling-update faults get?
-- Poll interval: 30 s matches nothing in particular; should it match the group's polling cadence? Read from their harness in task 1.
+- Poll interval: settled 2026-10-14. The group polls every 15 s after a 15 s wait, so Tier 3 does the same; the detection window is 240 s, not their 1500 s, because Jev answers in about a second.

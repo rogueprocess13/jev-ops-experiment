@@ -27,3 +27,5 @@ results/*
 .DS_Store
 tier2/testbed/opentelemetry-demo/
 tier2/testbed/IMAGES
+tier3/testbed/kubeconfig
+tier3/testbed/VERSION

@@ -1,0 +1,24 @@
+experiment_id: K007
+application: otel-demo-3.1.0-kind
+description: valkey-cart scaled to zero replicas
+rationale: >
+  cart's backing store has no pods. cart stays up but every cart operation fails, so errors show
+  in cart, frontend and checkout, while the valkey-cart deployment row shows 0 available. The
+  origin is valkey-cart, not cart, which tests whether the engine follows the dependency.
+  Restoring replicas or undoing the change fixes it.
+fault:
+  type: dependency_removal
+  target: valkey-cart
+target_component: valkey-cart
+duration_s: 240
+detection_window_s: 240
+poll_interval_s: 15
+observation_window_s: 180
+baseline_window_s: 180
+workload:
+  users: 10
+expected:
+  incident: true
+  affected_component: valkey-cart
+  diagnosis: service_unavailable
+  acceptable_actions: [scale_up, rollback_change, investigate, escalate]

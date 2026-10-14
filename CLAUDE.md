@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Purpose
 
-Experimental benchmark: can Jev AI make bounded operational decisions from observations? Two tiers. **Tier 1** feeds Jev synthetic server-state data (severity, action, human review, probable cause) and compares its decision with an independently defined expected outcome. **Tier 2** injects a known fault into the OpenTelemetry Demo (Docker Compose), builds an observation from the real telemetry, and scores detection, localization, diagnosis and action separately against hidden ground truth. This is **not** a production remediation system. Never add code that acts on Jev's recommendation (restart, escalate, and so on). The runners only record it. The only state-changing operations in Tier 2 are the harness's own fault inject and reset.
+Experimental benchmark: can Jev AI make bounded operational decisions from observations? Three tiers. **Tier 1** feeds Jev synthetic server-state data (severity, action, human review, probable cause) and compares its decision with an independently defined expected outcome. **Tier 2** injects a known fault into the OpenTelemetry Demo (Docker Compose), builds an observation from the real telemetry, and scores detection, localization, diagnosis and action separately against hidden ground truth. **Tier 3** injects the LF Edge AIOps group's ten Kubernetes faults into the demo on a local kind cluster, polls Jev for time-to-detect, and reports in the group's scorecard terms. This is **not** a production remediation system. Never add code that acts on Jev's recommendation (restart, escalate, and so on). The runners only record it. The only state-changing operations in Tier 2 and Tier 3 are the harness's own fault inject and reset.
 
 ## Rules that must not be broken
 
@@ -31,6 +31,19 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 - **Faults are flagd flags only**, verified against the pinned demo version (3.1.0). Do not invent other fault mechanisms. Scenario expected outcomes are hand-written with a rationale, as in Tier 1. Note `docs/otel-demo-notes.md` when a flag behaves differently from the demo's docs.
 - **Do not modify the demo checkout** (`tier2/testbed/opentelemetry-demo`, git-ignored). The pinned images come from `DEMO_VERSION=3.1.0` set as an environment variable, not from editing its `.env`. One expected exception: flagd-ui rewrites `src/flagd/demo.flagd.json` on every toggle, so `git status` there shows it modified after any run (formatting and a dropped `$schema` key only; flag values are restored). `git -C tier2/testbed/opentelemetry-demo checkout src/flagd/demo.flagd.json` restores it exactly.
 - Tier 2 tests are offline: fake flag store, fake collectors, fake engine, virtual clock. Never start Docker or call Jev from a test.
+
+## Tier 3 rules (Kubernetes faults on kind)
+
+- **Kubernetes is allowed only for the Tier 3 testbed**: a local kind cluster created by `tier3/testbed/`. Nothing in Tier 1 or Tier 2 may depend on it.
+- **Still recommendation-only.** The harness never carries out Jev's recommended action. Remediation executed, MTTR and recovery verified are reported as "not measured (recommendation only)".
+- **Faults are the LF Edge harness's ten Kubernetes fault types, with their names** (`tier3/vocab.py` `FAULT_TYPES`), injected through the Kubernetes API in `tier3/faults.py`. Do not invent other fault types here. Real node faults on VMs are a separate, later change.
+- **No self-describing markers.** An injected fault must not add a label, annotation, variable or object name that names the fault or the experiment. Harness objects and taints use the `jev-fault` prefix, which the scrubber always removes (`test_no_self_describing_marker`).
+- **Save before you change, restore exactly.** Every inject writes the saved state to `results/tier3/.active-fault.json` first, reads the change back, and reset restores the saved state (not fixed values) and reads it back. `node_taint` only targets an application worker and only removes its own taint. The dead-man timer (`tier3/deadman.py`) and `python -m tier3 reset-faults` must keep working from the ledger alone.
+- **Ground truth never reaches the engine.** `tier3/observation.py`, `tier3/collect.py` and `tier3/collectors/kube.py` must not import `tier3.scenarios` or `tier3.faults`. The observation shows effects only: no pod specs, environment variables, resource limits, NetworkPolicy objects or taint keys. The whole-path leak test in `tests/tier3/test_runner.py` covers every scenario and every poll.
+- **Polling is scored once.** In `poll` mode the first poll that reports an incident is scored (else the last poll); every poll is stored. On the healthy control every detecting poll is a false-positive poll.
+- **Only the adapter touches Jev.** `tier3/jev_adapter.py` is the only Tier 3 module that imports `jev.client` (`test_only_the_adapter_imports_jev_client`).
+- **No Kubernetes Python client.** The API is reached with `requests` (`tier3/collectors/kube.py`); pod exec uses `kubectl`. Versions are pinned in `tier3/testbed/pins.env`; facts verified on the cluster go in `docs/k8s-testbed-notes.md`.
+- Tier 3 tests are offline: `FakeKube`, fake collectors, fake engine, virtual clock. Never start kind or Docker, or call Jev, from a test.
 
 ## Layout
 
@@ -59,7 +72,17 @@ tier2/                     Tier 2 (OpenTelemetry Demo)
   runner.py cli.py         lifecycle, batch, command line
   testbed/                 setup.sh, stop.sh, demo checkout (git-ignored)
 tests/tier2/               offline Tier 2 tests
+tier3/                     Tier 3 (LF Edge Kubernetes faults on kind)
+  scenarios/K*.yaml vocab.py scenarios.py   catalogue K000-K010, vocabularies, loader
+  faults.py deadman.py     ten fault types, ledger, exact restore; dead-man timer
+  collectors/kube.py collect.py   thin Kubernetes API client; Tier 2 collectors + cluster state
+  observation.py manifest.py      observation builder and scrubber; manifestation and recovery checks
+  engine.py jev_adapter.py AIOpsEngine + Decision; the Jev adapter
+  runner.py evaluate.py report.py cli.py   lifecycle and polling; verdicts; scorecard and exports
+  testbed/                 pins.env, kind.yaml, values/, create/install/health/stop/start/delete scripts
+tests/tier3/               offline Tier 3 tests
 setup.sh health-check.sh run-experiment run-all-experiments   Tier 2 entry points
+setup-k8s.sh health-check-k8s.sh run-k8s-experiment run-all-k8s-experiments   Tier 3 entry points
 ```
 
 ## Commands
@@ -81,15 +104,21 @@ setup.sh health-check.sh run-experiment run-all-experiments   Tier 2 entry point
 | Tier 2 one run | `./run-experiment F003` (`list` shows IDs) |
 | Tier 2 batch | `./run-all-experiments [--repeats N]` |
 | Tier 2 unstick | `python -m tier2 reset-faults` |
+| Tier 3 setup | `./setup-k8s.sh` (pre-check, kind cluster, demo chart, health) |
+| Tier 3 health | `./health-check-k8s.sh` |
+| Tier 3 one run | `./run-k8s-experiment K001` (`list` shows IDs; `--mode single` for one call) |
+| Tier 3 batch | `./run-all-k8s-experiments [--repeats N]`, or `... K000 --repeats 10` for the control |
+| Tier 3 unstick | `python -m tier3 reset-faults` |
+| Tier 3 scorecard | `python -m tier3 scorecard results/tier3/<run-id>` (also `export-lfedge`, `export-reasoning`) |
 
 `run.py` and `run-all.sh` need `JEV_API_KEY` in `.env` for the default `jev` engine. Each run makes one real model call, so use small `--runs` while developing.
 
 ## Conventions
 
 - Python 3.10+. Dependencies: `requests`, `python-dotenv`, `pyyaml`, `pytest`, `anthropic` (baseline engines only).
-- Keep it simple. Do not add Kubernetes. Docker Compose is allowed **only** for the Tier 2 testbed (the OpenTelemetry Demo); Tier 1 stays Python-only. Prometheus, Jaeger, OpenSearch and Grafana are the demo's own components, queried over HTTP, not something this repo deploys.
+- Keep it simple. Docker Compose is allowed **only** for the Tier 2 testbed and Kubernetes (a local kind cluster) **only** for the Tier 3 testbed; Tier 1 stays Python-only. Prometheus, Jaeger, OpenSearch and Grafana are the demo's own components, queried over HTTP, not something this repo deploys.
 - Changing a scenario's expected outcome or profile is a change to the experiment, not a bug fix. Update its rationale, the README table and the tests, and say so in the commit.
-- Mark tasks done in `openspec/changes/jev-ops-experiment-v1/tasks.md` (Tier 1) and `openspec/changes/otel-demo-tier2/tasks.md` (Tier 2) as work completes.
+- Mark tasks done in `openspec/changes/jev-ops-experiment-v1/tasks.md` (Tier 1), `openspec/changes/otel-demo-tier2/tasks.md` (Tier 2) and `openspec/changes/k8s-faults-tier3/tasks.md` (Tier 3) as work completes.
 - `results/*` is git-ignored except `.gitkeep`. Do not commit result files unless deliberately publishing a sample run, and label it as such.
 - Commit messages end with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
@@ -97,11 +126,11 @@ setup.sh health-check.sh run-experiment run-all-experiments   Tier 2 entry point
 
 Other people clone this repo and run it. Keep these working:
 
-- `./run-all.sh --check` on a fresh clone sets up everything and passes with no key and no network access to Jev. It runs the Tier 1 and Tier 2 tests (neither needs Docker). CI runs exactly this on Python 3.10-3.13 (`.github/workflows/tests.yml`).
+- `./run-all.sh --check` on a fresh clone sets up everything and passes with no key and no network access to Jev. It runs the Tier 1, Tier 2 and Tier 3 tests (none needs Docker or a cluster). CI runs exactly this on Python 3.10-3.13 (`.github/workflows/tests.yml`).
 - New dependencies go in `requirements.txt`, pinned.
 - New environment variables go in `.env.example` and the README table.
 - Keep code compatible with Python 3.10.
 
 ## Status
 
-Everything except the live runs is implemented and tested offline. Still open: the first real-Jev run (needs an API key), then marking `PLAN.md` implemented and tagging v0.1.0.
+Everything except the live runs is implemented and tested offline. Still open: the first real-Jev run (needs an API key), then marking `PLAN.md` implemented and tagging v0.1.0. Tier 3 code and offline tests are written; task group 1 (verifying kind, the chart and every fault on a real cluster) and the live runs are not done yet.

@@ -1,0 +1,25 @@
+experiment_id: K006
+application: otel-demo-3.1.0-kind
+description: cart given an invalid DATABASE_HOST
+rationale: >
+  The group's fault adds DATABASE_HOST pointing at a host that does not exist. If cart reads it,
+  cart cannot reach its store and fails. cart is believed to read VALKEY_ADDR instead, in which
+  case the only effect is a pod restart (task 1.8 decides; the scenario may be dropped or
+  retargeted). The origin is cart; the failure mode is misconfiguration. Undoing the change
+  fixes it.
+fault:
+  type: config_corruption
+  target: cart
+target_component: cart
+duration_s: 240
+detection_window_s: 240
+poll_interval_s: 15
+observation_window_s: 180
+baseline_window_s: 180
+workload:
+  users: 10
+expected:
+  incident: true
+  affected_component: cart
+  diagnosis: misconfiguration
+  acceptable_actions: [rollback_change, investigate, escalate]

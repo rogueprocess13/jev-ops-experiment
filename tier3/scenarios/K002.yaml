@@ -1,0 +1,25 @@
+experiment_id: K002
+application: otel-demo-3.1.0-kind
+description: cart pods deleted once
+rationale: >
+  The cart pod is deleted and the deployment replaces it. Calls fail for the seconds until the
+  new pod is ready, then the system is healthy again. The evidence is a new pod with a short age
+  and possibly a few errors. Nothing needs doing once it has recovered, so no_action and
+  investigate are acceptable. Provisional: task 1.9 checks whether the symptom lasts long enough
+  to observe at all; if not, the scenario is dropped or set to incident: false.
+fault:
+  type: kill_pod
+  target: cart
+target_component: cart
+duration_s: 240
+detection_window_s: 240
+poll_interval_s: 15
+observation_window_s: 180
+baseline_window_s: 180
+workload:
+  users: 10
+expected:
+  incident: true
+  affected_component: cart
+  diagnosis: pod_restart
+  acceptable_actions: [no_action, investigate]

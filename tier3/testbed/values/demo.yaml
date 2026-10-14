@@ -1,0 +1,46 @@
+# OpenTelemetry Demo chart values for Tier 3 (design D2, D3). Values only: the
+# chart is never forked or patched. Key paths for the demo components are the
+# chart's `default` / `components.<name>` blocks; subchart keys are those of each
+# subchart. Every path here is checked in task 1.4 (placement after install).
+
+# Application services run on the two application workers.
+default:
+  schedulingRules:
+    nodeSelector:
+      jev-role: app
+
+# Harness, load and flag infrastructure run on the observability worker, so
+# faults on application nodes never break the load or the measurement.
+components:
+  load-generator:
+    schedulingRules:
+      nodeSelector:
+        jev-role: observability
+  flagd:
+    schedulingRules:
+      nodeSelector:
+        jev-role: observability
+
+opentelemetry-collector:
+  nodeSelector:
+    jev-role: observability
+
+jaeger:
+  allInOne:
+    nodeSelector:
+      jev-role: observability
+  nodeSelector:            # newer jaeger chart layout; one of the two applies
+    jev-role: observability
+
+prometheus:
+  server:
+    nodeSelector:
+      jev-role: observability
+
+grafana:
+  nodeSelector:
+    jev-role: observability
+
+opensearch:
+  nodeSelector:
+    jev-role: observability
