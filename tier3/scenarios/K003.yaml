@@ -2,10 +2,13 @@ experiment_id: K003
 application: otel-demo-3.1.0-kind
 description: cart memory limit set to 10Mi
 rationale: >
-  The new cart pod is OOM-killed on start and crash-loops. With one replica and a rolling
-  update, the old pod may keep serving, so users may see nothing and the evidence is a stuck
-  rollout with OOMKilled restarts (task 1.7 decides). The origin is cart; the failure mode is
-  out-of-memory. Undoing the change fixes it.
+  The cart pod template gets a 10Mi memory limit. Measured on kind (2026-10-14): unlike the
+  other template changes, the new pod passes its start-up and becomes Ready, so the rolling
+  update completes and the old pod is gone; user requests then return 500 from the first 15 s
+  poll and checkout errors reach 100%. The container first exits with Error (about 90 s), then
+  is OOMKilled and crash-loops with BackOff Warning events from about 150 s; the deployment
+  drops to 0 available. The origin is cart; the failure mode is out-of-memory. Undoing the
+  change fixes it.
 fault:
   type: memory_limit
   target: cart

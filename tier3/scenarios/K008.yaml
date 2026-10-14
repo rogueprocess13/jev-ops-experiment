@@ -4,8 +4,10 @@ description: cart scaled to zero while the load generator triples
 rationale: >
   As in the group's harness, cart goes to zero replicas and the load generator to three. The
   load generator is excluded from the observation (it is the harness's own traffic source), so
-  what the engine sees is cart unavailable under higher load. The origin is cart; the failure
-  mode is that the service is not running. Provisional until task 1.6.
+  what the engine sees is cart unavailable under higher load. Measured on kind (2026-10-14):
+  the same signals as K001 (cart 0/0, user requests 500 from the first poll, checkout errors
+  at 100% and frontend about 20% from about 60 s), with more frontend error logs. The origin is
+  cart; the failure mode is that the service is not running.
 fault:
   type: replica_overload
   target: cart

@@ -13,6 +13,7 @@ nodes:
       - {containerPort: 30080, hostPort: 18080, listenAddress: "127.0.0.1"}  # frontend-proxy
       - {containerPort: 30090, hostPort: 19090, listenAddress: "127.0.0.1"}  # prometheus
       - {containerPort: 30920, hostPort: 19200, listenAddress: "127.0.0.1"}  # opensearch
+      - {containerPort: 30686, hostPort: 19686, listenAddress: "127.0.0.1"}  # jaeger query
   - role: worker
     labels: {jev-role: observability}
   - role: worker

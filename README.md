@@ -421,21 +421,21 @@ Compare only detect, RCA, remediation correct and MTTD, and say that Jev did not
 
 ### Scenarios
 
-| ID | Fault | Target | Expected component | Expected diagnosis | Acceptable actions |
-|---|---|---|---|---|---|
-| K000 | none (healthy control) | none | none | none | no_action |
-| K001 | scale_zero | cart | cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
-| K002 | kill_pod | cart | cart | pod_restart | no_action, investigate |
-| K003 | memory_limit | cart | cart | oom_killed | rollback_change, investigate, escalate |
-| K004 | network_partition | cart | cart | network_blocked | rollback_change, investigate, escalate |
-| K005 | readiness_probe_fail | cart | cart | readiness_failure | rollback_change, investigate, escalate |
-| K006 | config_corruption | cart | cart | misconfiguration | rollback_change, investigate, escalate |
-| K007 | dependency_removal | valkey-cart | valkey-cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
-| K008 | replica_overload | cart | cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
-| K009 | node_taint | jev-worker2 | jev-worker2 | node_eviction | investigate, escalate |
-| K010 | pvc_full | cart | cart | disk_full | investigate, escalate |
+| ID | Fault | Target | Incident | Expected component | Expected diagnosis | Acceptable actions |
+|---|---|---|---|---|---|---|
+| K000 | none (healthy control) | none | no | none | none | no_action |
+| K001 | scale_zero | cart | yes | cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
+| K002 | kill_pod | cart | no | cart | pod_restart | no_action, investigate |
+| K003 | memory_limit | cart | yes | cart | oom_killed | rollback_change, investigate, escalate |
+| K004 | network_partition | cart | no | none | none | no_action, investigate |
+| K005 | readiness_probe_fail | cart | yes | cart | readiness_failure | rollback_change, investigate, escalate |
+| K006 | config_corruption | cart | no | none | none | no_action, investigate |
+| K007 | dependency_removal | valkey-cart | yes | valkey-cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
+| K008 | replica_overload | cart | yes | cart | service_unavailable | scale_up, rollback_change, investigate, escalate |
+| K009 | node_taint | jev-worker2 | yes | jev-worker2 | node_eviction | investigate, escalate |
+| K010 | pvc_full | cart | no | cart | oom_killed | no_action, investigate |
 
-Each file in `tier3/scenarios/` has the rationale. Three groups are expected to change after task group 1: the rolling-update faults (K003, K005, K006) may not affect users while the old pod keeps serving; `config_corruption` may do nothing on cart, which is thought to read `VALKEY_ADDR`, not `DATABASE_HOST`; K002 and K010 may leave no visible symptom.
+Each file in `tier3/scenarios/` has the rationale, with the behaviour measured on the cluster (2026-10-14, `docs/k8s-testbed-notes.md`). Four of the group's faults turned out not to be incidents on this testbed, and their expected outcomes changed: `kill_pod` (K002) and `pvc_full` (K010, no volume; the write gets cart OOMKilled once) heal themselves within seconds; `network_partition` (K004) blocks only new connections, and the frontend's existing gRPC connection to cart survives; `config_corruption` (K006) sets a variable no service reads. They stay in the catalogue, so the export covers the group's full list, and they add to the false-alarm measurement.
 
 ### How a run works
 
@@ -471,7 +471,8 @@ A polling run makes up to 16 Jev calls (one per poll). The scorecard shows count
 |---|---|
 | `TIER3_KUBECONFIG` | `tier3/testbed/kubeconfig` (written by `create.sh`) |
 | `TIER3_NAMESPACE` | `otel-demo` |
-| `TIER3_BASE_URL` | `http://localhost:18080` (frontend-proxy: frontend, `/jaeger`, `/loadgen`) |
+| `TIER3_BASE_URL` | `http://localhost:18080` (frontend-proxy: frontend, `/loadgen`) |
+| `TIER3_JAEGER_URL` | `http://localhost:19686` (Jaeger query on its own NodePort) |
 | `TIER3_PROMETHEUS_URL` | `http://localhost:19090` |
 | `TIER3_OPENSEARCH_URL` | `http://localhost:19200` |
 

@@ -90,16 +90,43 @@ Measured after settling (`docker stats`, 17:51):
 
 Startup peaked at load average 8.2 (16 cores) for a few minutes. Docker volumes grew by about 11 GB (images stored inside the kind nodes). The 8 GB pre-check leaves about 3 GB of headroom.
 
-## Fault behaviour on the cluster (tasks 1.6-1.9, open)
+## Fault behaviour on the cluster (tasks 1.6-1.10, 2026-10-14)
 
-For each fault, record what shows in span metrics, Jaeger, OpenSearch, deployments, pods, nodes and events, how long it takes, and that exact restore works. Open questions:
+Each fault was injected by hand with `tier3/testbed/probe_fault.py` (the real injector, ledger and dead-man timer, no engine), held for 240 s and sampled every 15 s: the harness's own collectors (span metrics over 120 s, Jaeger, OpenSearch, Kubernetes state), every new event of any type, and a user request to `/api/cart` through frontend-proxy. Records are in `results/tier3/probe/` (git-ignored). Times are seconds after inject. Exact restore read back cleanly every time.
 
-- **Rolling updates** (`memory_limit`, `readiness_probe_fail`, `config_corruption`): with one replica, does the old pod keep serving? Decide `expected.incident` for K003, K005 and K006 with a rationale.
-- **`config_corruption` on cart**: does cart read `DATABASE_HOST`? If not, drop or retarget K006 and tell the group, since their matrix uses it.
-- **`kill_pod`** (K002): is the symptom still visible at the first poll, 15 s after injection?
-- **`pvc_full`** (K010): does the cart image have `sh` and `dd`? Does 500 MB in the writable layer cause any symptom on kind?
-- Capture real Warning events as leak-test fixtures (task 1.10) and list every string that names a fault or a harness object.
+| Fault (target) | User request | First signals | Later | Events | Recovered after reset |
+|---|---|---|---|---|---|
+| scale_zero (cart) | 500 from 15 s | cart 0/0; frontend error logs and failing traces at 15 s | span-metric errors from about 90 s: frontend about 20%, checkout 100%; cart drops out of span metrics | Normal only | 151 s |
+| kill_pod (cart) | 200 throughout | new cart pod Ready by 15 s ("pods replaced") | frontend errors 1% between about 60 and 105 s, then baseline | Normal only | 0 s |
+| memory_limit (cart) | 500 from 15 s | rollout completes (the 10Mi pod starts and passes readiness), old pod gone | checkout errors 67% then 100%, frontend about 20% from about 75 s; container exits Error at about 90 s, OOMKilled at about 165 s, then CrashLoopBackOff, 0 available | BackOff (Warning) from about 150 s | 120 s |
+| network_partition (cart) | 200 throughout | nothing | nothing for 240 s | none | 0 s |
+| readiness_probe_fail (cart) | 200 throughout | new pod never Ready, old pod keeps serving, rollout stuck "progressing" | unchanged; error rates at baseline | Unhealthy (Warning) every poll | 15 s |
+| config_corruption (cart) | 200 throughout | a routine rolling update, new pod Ready by 15 s | nothing | Normal only | 15 s |
+| dependency_removal (valkey-cart) | times out (over 10 s) from 15 s | valkey-cart 0/0 | frontend p95 about 3.6 s from about 105 s; cart errors 100% only from about 165 s; error rates otherwise near zero (calls hang, they do not fail) | Normal only | 75 s |
+| replica_overload (cart) | 500 from 15 s | as scale_zero: cart 0/0 (the group's fault scales the target to zero and the load generator to three) | checkout 100%, frontend about 20% from about 60 s; more frontend error logs | Normal only | 120 s |
+| node_taint (jev-worker2) | 200 throughout | 5 services evicted, replacements Ready on jev-worker3 by 15 s; node shows NoExecute and 0 pods | product-catalog errors about 15%, frontend about 3%, gone by about 150 s | Normal only (TaintManagerEviction) | 0 s |
+| pvc_full (cart) | 500 at 15 s, 200 from 30 s | container OOMKilled mid-write and restarted ("pod restarted", last termination OOMKilled) | frontend errors about 8% between about 75 and 120 s, then baseline | one BackOff (Warning) | 0 s |
+
+### What the probes settled
+
+- **Rolling updates (task 1.7).** With one replica the Deployment keeps the old pod until the new one is Ready. `readiness_probe_fail`: the new pod is never Ready, so the old pod serves and users see nothing; the evidence is the stuck rollout and Unhealthy events. `memory_limit`: the 10Mi pod does start and pass readiness, so the old pod is removed and users get errors at once; the OOM kills come later. `config_corruption`: an ordinary rollout.
+- **`config_corruption` (task 1.8).** No service in demo 3.1.0 reads `DATABASE_HOST` (cart reads `VALKEY_ADDR`), and on the cluster the fault is a rolling restart and nothing else. For the group: on this demo version their fault is a no-op.
+- **`network_partition` is latent.** kindnet (kube-network-policies) enforces the policy for new connections: a new TCP connect from the load-generator pod to `cart:8080` timed out after 5 s while the policy was in place, and connected at once after reset. But the frontend keeps a long-lived gRPC connection to cart, and established connections are let through, so user traffic never notices. Calico and most iptables-based enforcers also accept established flows, so the group's harness likely sees the same unless the caller reconnects.
+- **`kill_pod` (task 1.9).** The replacement is Ready before the first poll; a 1% error blip shows in span metrics for about 45 s. It heals itself.
+- **`pvc_full` (task 1.9).** The cart pod has no PersistentVolumeClaim (no Tier 3 service has one) and `/tmp` is the container's writable layer on the host disk (929 GB, 344 GB free), so the write cannot fill a disk. The cart image has `sh` and `dd`. The 500 MB write fills page cache, which counts against cart's 160Mi memory limit, and the container is OOMKilled mid-write (exit 137) and restarts with a fresh writable layer, so the file is gone. The injector treats exit 137 followed by a reported restart as the fault taking effect, and restore treats a restarted container as the file removed (it waits up to 30 s for the kubelet to report the restart). On the cluster: one OOMKill and restart, a 500 for about 15 s, and a short error burst; it heals itself.
+- **Placement drifts.** After `node_taint` the evicted pods stay on jev-worker3 when the taint goes; a second `node_taint` on the empty node evicted nothing (the first rerun showed no effect at all). The health check now requires application pods on both app nodes, and `tier3/testbed/rebalance.sh` restarts the app Deployments one at a time to spread them again (restarting them all at once put every new pod on the empty node).
+- **Collection must not depend on an app node.** The first `node_taint` probe crashed: Jaeger was queried through frontend-proxy (`/jaeger/ui`), and frontend-proxy was evicted. Jaeger now has its own NodePort (`host-jaeger`, 30686, host port 19686 in `kind.yaml`; `TIER3_JAEGER_URL`). A cluster created before this change has no host port for it; set `TIER3_JAEGER_URL` to `http://<jev-worker IP>:30686` or recreate the cluster.
+- **Most faults emit only Normal events.** The observation carries Warning events only, so for scale_zero, dependency_removal, replica_overload, kill_pod, config_corruption and node_taint the engine sees replica counts, pod and node state and telemetry, not events. The only Warning events seen in all ten probes were `BackOff` (memory_limit) and `Unhealthy` with the message `Readiness probe failed: ` (readiness_probe_fail); no `OOMKilling` or `FailedScheduling` event appeared (jev-worker3 had room).
+- **No self-describing strings (task 1.10).** Every event captured in the probes (all types) was scanned for `jev-fault`, `harness` and the ten fault names: none found. The NetworkPolicy and the taint key never appear in an event; the readiness probe's command does not appear in the Unhealthy message. The leak-test fixtures in `tests/tier3/helpers.py` stay as written: they are a superset (they also plant the taint key and fault names) of what the cluster produced.
 
 ## Dropped or changed scenarios
 
-None yet.
+No scenario was dropped: all ten of the group's faults stay in the catalogue so the export covers their full list. Expected outcomes changed after the probes (a change to the experiment, not a fix):
+
+| ID | Was | Now | Why |
+|---|---|---|---|
+| K002 kill_pod | incident | no incident (still cart, pod_restart) | heals before the first poll; only a 1% blip |
+| K004 network_partition | incident, cart, network_blocked | no incident, none, none | nothing observable; existing connections survive the policy |
+| K006 config_corruption | incident, cart, misconfiguration | no incident, none, none | the variable is not read; only a routine rollout |
+| K010 pvc_full | incident, cart, disk_full | no incident, cart, oom_killed | no volume to fill; the write gets the container OOMKilled once and it heals itself |
+K003, K005, K007, K008 and K009 keep their expected outcomes; their rationales now quote the measured behaviour. K005 stays an incident although users are not hurt: the rollout is broken and needs attention.

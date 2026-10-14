@@ -79,7 +79,7 @@ tier3/                     Tier 3 (LF Edge Kubernetes faults on kind)
   observation.py manifest.py      observation builder and scrubber; manifestation and recovery checks
   engine.py jev_adapter.py AIOpsEngine + Decision; the Jev adapter
   runner.py evaluate.py report.py cli.py   lifecycle and polling; verdicts; scorecard and exports
-  testbed/                 pins.env, kind.yaml, values/, create/install/health/stop/start/delete scripts
+  testbed/                 pins.env, kind.yaml, values/, create/install/health/stop/start/delete/rebalance scripts, probe_fault.py
 tests/tier3/               offline Tier 3 tests
 setup.sh health-check.sh run-experiment run-all-experiments   Tier 2 entry points
 setup-k8s.sh health-check-k8s.sh run-k8s-experiment run-all-k8s-experiments   Tier 3 entry points
@@ -133,4 +133,4 @@ Other people clone this repo and run it. Keep these working:
 
 ## Status
 
-Everything except the live runs is implemented and tested offline. Still open: the first real-Jev run (needs an API key), then marking `PLAN.md` implemented and tagging v0.1.0. Tier 3 code and offline tests are written; task group 1 (verifying kind, the chart and every fault on a real cluster) and the live runs are not done yet.
+Everything except the live runs is implemented and tested offline. Still open: the first real-Jev run (needs an API key), then marking `PLAN.md` implemented and tagging v0.1.0. Tier 3 code and offline tests are written, and every fault has been verified on the kind cluster (task group 1, `docs/k8s-testbed-notes.md`); the live Jev runs are not done yet.

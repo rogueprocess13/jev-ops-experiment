@@ -148,3 +148,14 @@ def test_subchart_pods_map_to_infra_not_to_their_component_label():
             "spec": {}, "status": {"phase": "Running"}}
     assert [r["service"] for r in pod_rows([prom, cart])] == ["cart"]
     assert is_infra("opamp-server") and is_infra("otel-collector-agent")
+
+
+def test_health_check_flags_an_empty_app_node(tmp_path):
+    kube = FakeKube()
+    for p in kube.pods.values():
+        if p["spec"]["nodeName"] == "jev-worker2":
+            p["spec"]["nodeName"] = "jev-worker3"
+    checks = testbed.run_checks(kube, None, None, None, FaultInjector(kube, ledger=tmp_path / "l"),
+                                os_url="http://x", get=lambda u: (200, b"{}"))
+    c = next(c for c in checks if c.name == "placement")
+    assert not c.ok and "jev-worker2 0 pods" in c.detail and "rebalance.sh" in c.detail

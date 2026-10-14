@@ -106,6 +106,52 @@ def test_pvc_full_write_failure_raises(tmp_path):
         inj.inject(FaultSpec("pvc_full", "cart"))
 
 
+def test_pvc_full_write_killed_by_oom_counts_as_applied(tmp_path, monkeypatch):
+    kube, inj = injector(tmp_path)
+
+    def killed(pod, command):
+        kube.pods[pod]["status"]["containerStatuses"][0]["restartCount"] += 1
+        return 137, "command terminated with exit code 137"
+    monkeypatch.setattr(kube, "exec", killed)
+    saved = inj.inject(FaultSpec("pvc_full", "cart"))
+    assert inj.ledger.exists() and saved["fill"]["restarts"] == 0
+    assert "restarted" in inj.reset()[0]
+
+
+def test_pvc_full_exit_137_without_restart_still_fails(tmp_path, monkeypatch):
+    kube, inj = injector(tmp_path)
+    monkeypatch.setattr("tier3.faults._sleep", lambda s: None)
+    monkeypatch.setattr(kube, "exec", lambda pod, command: (137, "killed"))
+    with pytest.raises(FaultError, match="write failed"):
+        inj.inject(FaultSpec("pvc_full", "cart"))
+
+
+def test_pvc_full_waits_for_the_restart_to_be_reported(tmp_path, monkeypatch):
+    kube, inj = injector(tmp_path)
+    pods = {}
+
+    def killed(pod, command):
+        pods["name"] = pod
+        return 137, "command terminated with exit code 137"
+
+    def late_report(s):  # the kubelet reports the restart after the exec returns
+        kube.pods[pods["name"]]["status"]["containerStatuses"][0]["restartCount"] = 1
+    monkeypatch.setattr(kube, "exec", killed)
+    monkeypatch.setattr("tier3.faults._sleep", late_report)
+    inj.inject(FaultSpec("pvc_full", "cart"))
+    assert "restarted" in inj.reset()[0]
+
+
+def test_pvc_full_restore_skips_rm_after_container_restart(tmp_path):
+    kube, inj = injector(tmp_path)
+    saved = inj.inject(FaultSpec("pvc_full", "cart"))
+    pod = kube.pods[saved["fill"]["pod"]]
+    pod["status"]["containerStatuses"][0]["restartCount"] += 1  # OOMKilled by the write
+    kube.exec_rc = 1  # exec would fail while the container restarts
+    assert "restarted" in inj.reset()[0]
+    assert not inj.ledger.exists()
+
+
 def test_kill_pod_replaces_every_pod(tmp_path):
     kube, inj = injector(tmp_path, FakeKube(replicas={"cart": 2}))
     old = {p["metadata"]["name"] for p in kube.list_pods({"opentelemetry.io/name": "cart"})}

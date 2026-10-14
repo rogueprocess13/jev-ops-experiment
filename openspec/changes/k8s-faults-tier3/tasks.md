@@ -5,12 +5,12 @@
 - [x] 1.3 By hand, create the four-node `jev` cluster with role labels and NodePort mappings; confirm whether the default CNI enforces NetworkPolicy, else recreate with pinned Calico (design D4)
 - [x] 1.4 Find the demo chart release whose `appVersion` is 3.1.0; install it with node selectors and NodePorts; confirm placement and measured memory; confirm Prometheus, Jaeger, OpenSearch and Locust are reachable from the host
 - [x] 1.5 Read the LF Edge harness (`lfedgeai/AIOps`, `research/agentic_aiops_architectures`) for its per-run JSON field names, its poll cadence and detection window, and record them for the export and D11 defaults
-- [ ] 1.6 Run each of the ten faults by hand on `cart` (and `valkey-cart`, `jev-worker2`); for each, record what shows in span metrics, Jaeger, OpenSearch, deployments, pods, nodes and events, how long it takes, and that exact restore works
-- [ ] 1.7 Settle the rolling-update question for `memory_limit`, `readiness_probe_fail` and `config_corruption`: does the old pod keep serving? Decide each scenario's `incident` ground truth with a rationale
-- [ ] 1.8 Check whether `cart` reads `DATABASE_HOST`; if not, drop or retarget `config_corruption` and note it for the group
-- [ ] 1.9 Check whether `kill_pod` and `pvc_full` leave a symptom long enough to observe; keep, retune or drop
-- [ ] 1.10 Capture real Warning events from these runs as leak-test fixtures and list every string that names a fault or harness object
-- [ ] 1.11 Write `docs/k8s-testbed-notes.md`: versions, ports, queries, fault behaviour, dropped scenarios and reasons, and the differences from the group's fault code (D5); delete or stop the cluster
+- [x] 1.6 Run each of the ten faults by hand on `cart` (and `valkey-cart`, `jev-worker2`); for each, record what shows in span metrics, Jaeger, OpenSearch, deployments, pods, nodes and events, how long it takes, and that exact restore works
+- [x] 1.7 Settle the rolling-update question for `memory_limit`, `readiness_probe_fail` and `config_corruption`: does the old pod keep serving? Decide each scenario's `incident` ground truth with a rationale
+- [x] 1.8 Check whether `cart` reads `DATABASE_HOST`; if not, drop or retarget `config_corruption` and note it for the group
+- [x] 1.9 Check whether `kill_pod` and `pvc_full` leave a symptom long enough to observe; keep, retune or drop
+- [x] 1.10 Capture real Warning events from these runs as leak-test fixtures and list every string that names a fault or harness object
+- [ ] 1.11 Write `docs/k8s-testbed-notes.md`: versions, ports, queries, fault behaviour, dropped scenarios and reasons, and the differences from the group's fault code (D5); delete or stop the cluster (notes written 2026-10-14; cluster kept running for group 10)
 
 ## 2. Testbed scripts
 
@@ -25,7 +25,7 @@
 
 - [x] 3.1 `tier3/collectors/kube.py`: thin HTTPS client from the kubeconfig with injectable `get`, `patch`, `put`, `post`, `delete`; deployments, pods, nodes, events, NetworkPolicies, pod exec for `pvc_full`
 - [x] 3.2 Reuse Tier 2's Prometheus, Jaeger and OpenSearch collectors against the Tier 3 NodePorts; `tier3/collect.py` assembles one `Telemetry` value
-- [ ] 3.3 Offline tests with fixtures from 1.10 and fake HTTP (written with hand-made fixtures in `tests/tier3/helpers.py`; replace or extend them with the events captured in 1.10)
+- [x] 3.3 Offline tests with fixtures from 1.10 and fake HTTP (hand-made fixtures in `tests/tier3/helpers.py`, extended with the two Warning events captured in 1.10)
 
 ## 4. Scenarios and vocabularies
 

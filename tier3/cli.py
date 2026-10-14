@@ -24,7 +24,7 @@ def _clients():
 
     kube = Kube.from_kubeconfig(testbed.kubeconfig(), testbed.namespace())
     return dict(kube=kube, injector=FaultInjector(kube), prom=Prometheus(testbed.prometheus_url()),
-                jaeger=Jaeger(testbed.base_url()), logs=OpenSearch(testbed.opensearch_url()),
+                jaeger=Jaeger(testbed.jaeger_url()), logs=OpenSearch(testbed.opensearch_url()),
                 workload=Workload(testbed.base_url()))
 
 

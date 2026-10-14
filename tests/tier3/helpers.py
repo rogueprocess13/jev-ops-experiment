@@ -180,9 +180,14 @@ def warning_event(reason, obj, message, ts="2026-01-01T00:02:00Z", ns=NS, count=
 
 
 def contaminated_events(experiment_id: str = "K009") -> list[dict]:
-    """Events as a real cluster may emit them, deliberately carrying every scrub term.
-    Replaced or extended with events captured on the real cluster in task 1.10."""
+    """Events as a real cluster may emit them, deliberately carrying every scrub term,
+    plus the only two Warning events the cluster emitted across all ten fault probes
+    (task 1.10, kind, 2026-10-14; messages verbatim, pod names shortened)."""
     return [
+        warning_event("BackOff", "Pod/cart-5dd4c7fd4f-6tvxh",
+                      "Back-off restarting failed container cart in pod cart-5dd4c7fd4f-6tvxh_otel-demo"
+                      "(416ecb39-5019-4c30-ab58-28c9462f45fb)", count=6),
+        warning_event("Unhealthy", "Pod/cart-5845946d4f-xrszw", "Readiness probe failed: ", count=16),
         warning_event("FailedScheduling", "Pod/cart-7d9f01-x0",
                       "0/4 nodes are available: 1 node(s) had untolerated taint {jev-fault: true}, "
                       "1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }."),

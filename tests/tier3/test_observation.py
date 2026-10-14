@@ -105,7 +105,7 @@ def test_restarted_and_new_pods_listed(tmp_path):
 
 def test_events_deduplicated_with_counts():
     kube = FakeKube()
-    kube.events = [contaminated_events()[1]] * 3
+    kube.events = [contaminated_events()[3]] * 3
     obs, _ = build_observation(telemetry(True), state(kube), state(kube), TERMS)
     assert len(obs["events"]) == 1 and obs["events"][0]["count"] == 12
 
@@ -161,3 +161,12 @@ def test_collector_and_jaeger_self_telemetry_dropped():
     text = json.dumps(build_observation(without_infra(t), KubeState())[0])
     assert "otelcol-contrib" not in text and "broker" not in text and "jaeger" not in text
     assert "checkout" in text  # application evidence kept
+
+
+def test_real_cluster_warnings_reach_the_observation():
+    kube = FakeKube()
+    kube.events = contaminated_events()[:2]  # captured on kind in task 1.10
+    obs, _ = build_observation(telemetry(True), state(kube), state(kube), TERMS)
+    got = {(e["reason"], e["message"]) for e in obs["events"]}
+    assert ("Unhealthy", "Readiness probe failed: ") in got
+    assert any(r == "BackOff" and "cart-5dd4c7fd4f-6tvxh" in m for r, m in got)

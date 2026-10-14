@@ -17,6 +17,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -27,6 +28,8 @@ TAINT = {"key": PREFIX, "value": "true", "effect": "NoExecute"}
 POLICY_NAME = f"{PREFIX}-np"
 FILL_PATH = f"/tmp/{PREFIX}-fill"
 FILL_MB = 500
+RESTART_WAIT_S = 30
+_sleep = time.sleep  # replaced in tests
 MEMORY_LIMIT = "10Mi"
 BAD_DB_HOST = "invalid-host-that-does-not-exist.local"  # the group's value, kept for comparability
 LOAD_GENERATOR = "load-generator"
@@ -144,7 +147,9 @@ class FaultInjector:
                     and not p["metadata"].get("deletionTimestamp")]
             if not pods:
                 raise FaultError(f"pvc_full: no running pod for {t}")
-            return {"fill": {"pod": sorted(p["metadata"]["name"] for p in pods)[0], "path": FILL_PATH}}
+            pod = sorted(pods, key=lambda p: p["metadata"]["name"])[0]
+            return {"fill": {"pod": pod["metadata"]["name"], "path": FILL_PATH,
+                             "restarts": _restarts(pod)}}
         raise FaultError(f"unknown fault type {fault.type!r}")
 
     def inject(self, fault: FaultSpec) -> dict:
@@ -187,7 +192,7 @@ class FaultInjector:
             f = saved["fill"]
             rc, out = k.exec(f["pod"], ["sh", "-c", f"dd if=/dev/zero of={f['path']} bs=1M "
                                                     f"count={FILL_MB}"])
-            if rc != 0:
+            if rc != 0 and not _was_killed_by_write(k, f, rc):
                 raise FaultError(f"pvc_full: write failed in {f['pod']} (rc={rc}): {out.strip()[-200:]}")
 
     def _read_back(self, fault: FaultSpec, saved: dict) -> None:
@@ -260,13 +265,47 @@ def restore(kube, saved: dict) -> list[str]:
             raise FaultError(f"restore mismatch: taint still on {node}")
     if saved.get("fill"):
         f = saved["fill"]
-        live = {p["metadata"]["name"] for p in kube.list_pods()}
-        if f["pod"] in live:  # a replaced pod took the file with it
+        live = {p["metadata"]["name"]: p for p in kube.list_pods()}
+        # A replaced pod, or a restarted container (new writable layer), took the file
+        # with it. The write itself can get the container OOMKilled (page cache counts
+        # against its memory limit; seen on cart, 2026-10-14).
+        if f["pod"] in live and _restarts(live[f["pod"]]) > f.get("restarts", _restarts(live[f["pod"]])):
+            done.append(f"container in {f['pod']} restarted; fill file gone with it")
+        elif f["pod"] in live:
             rc, out = kube.exec(f["pod"], ["rm", "-f", f["path"]])
-            if rc != 0:
+            if rc == 0:
+                done.append(f"fill file removed from {f['pod']}")
+            elif _container_restarted(kube, f):  # exec raced the restart
+                done.append(f"container in {f['pod']} restarted; fill file gone with it")
+            else:
                 raise FaultError(f"restore failed: could not remove fill file in {f['pod']}: {out[-200:]}")
-            done.append(f"fill file removed from {f['pod']}")
     return done
+
+
+def _was_killed_by_write(kube, fill: dict, rc: int) -> bool:
+    """The write is the fault. On a pod with a small memory limit, the page cache it fills
+    counts against the limit and the container is OOMKilled mid-write (exit 137; seen on
+    cart, 2026-10-14). That is the fault taking effect, not a failed inject."""
+    return rc == 137 and _container_restarted(kube, fill)
+
+
+def _container_restarted(kube, fill: dict) -> bool:
+    """Whether the fill pod's container restarted since inject. The kubelet reports the
+    restart a few seconds after the kill, so wait for it (up to RESTART_WAIT_S)."""
+    for i in range(RESTART_WAIT_S // 2 + 1):
+        pod = next((p for p in kube.list_pods() if p["metadata"]["name"] == fill["pod"]), None)
+        if pod is None:
+            return False
+        if _restarts(pod) > fill.get("restarts", _restarts(pod)):
+            return True
+        if i < RESTART_WAIT_S // 2:
+            _sleep(2)
+    return False
+
+
+def _restarts(pod: dict) -> int:
+    return sum(int(c.get("restartCount") or 0)
+               for c in (pod.get("status") or {}).get("containerStatuses") or [])
 
 
 def reset_faults(kube, ledger: Path = DEFAULT_LEDGER) -> list[str]:
