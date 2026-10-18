@@ -159,3 +159,12 @@ def test_health_check_flags_an_empty_app_node(tmp_path):
                                 os_url="http://x", get=lambda u: (200, b"{}"))
     c = next(c for c in checks if c.name == "placement")
     assert not c.ok and "jev-worker2 0 pods" in c.detail and "rebalance.sh" in c.detail
+
+
+def test_placement_ok_matches_the_health_check():
+    kube = FakeKube()
+    assert testbed.placement_ok(kube)
+    for p in kube.pods.values():
+        if p["spec"]["nodeName"] == "jev-worker2":
+            p["spec"]["nodeName"] = "jev-worker3"
+    assert not testbed.placement_ok(kube)

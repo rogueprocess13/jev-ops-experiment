@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from tier3.scenarios import ScenarioError, format_list, get_scenario, load_all
 from tier3.vocab import FAULT_TYPES
 
 DEFAULT_RESULTS = Path("results") / "tier3"
+REPO = Path(__file__).resolve().parents[1]
 
 
 def _clients():
@@ -46,7 +48,14 @@ def build_deps():
         if failed:
             raise RuntimeError("testbed unhealthy: " + "; ".join(f"{x.name} ({x.detail})" for x in failed))
 
+    def between_runs():
+        # node_taint leaves one app node empty; the next run's health check would refuse it.
+        if not testbed.placement_ok(c["kube"]):
+            print("placement unbalanced after the run; running tier3/testbed/rebalance.sh", flush=True)
+            subprocess.run([str(REPO / "tier3" / "testbed" / "rebalance.sh")], check=True)
+
     return Deps(engine=engine, injector=c["injector"], workload=c["workload"], health=health,
+                between_runs=between_runs,
                 stats=c["prom"].service_stats,
                 kube_state=lambda start_s=None, end_s=None: kube_state(c["kube"], start_s, end_s),
                 collect=lambda **kw: collect(c["prom"], c["jaeger"], c["logs"], c["kube"], **kw),

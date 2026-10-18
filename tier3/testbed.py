@@ -70,6 +70,25 @@ def _get(url: str, timeout: float = 8.0):
         return r.status, r.read()
 
 
+def placement(kube) -> tuple[bool, str]:
+    """Application pods on both app nodes. node_taint drains an app node and nothing moves
+    back after the taint is removed (seen 2026-10-14); a later node_taint on the empty node
+    would then evict nothing."""
+    from tier3.collectors.kube import pod_rows
+    from tier3.vocab import APP_NODES
+    counts = {n: 0 for n in APP_NODES}
+    for p in pod_rows(kube.list_pods()):
+        if p["node"] in counts:
+            counts[p["node"]] += 1
+    empty = [n for n, c in counts.items() if c == 0]
+    return (not empty, ", ".join(f"{n} {c} pods" for n, c in counts.items())
+            + (" (run: tier3/testbed/rebalance.sh)" if empty else ""))
+
+
+def placement_ok(kube) -> bool:
+    return placement(kube)[0]
+
+
 def run_checks(kube, prom, jaeger, workload, injector, os_url: str | None = None,
                now: float | None = None, get=_get) -> list[Check]:
     """Nodes, deployments, placement, Prometheus, span metrics, Jaeger, OpenSearch, Locust,
@@ -105,19 +124,6 @@ def run_checks(kube, prom, jaeger, workload, injector, os_url: str | None = None
         return (bool(rows) and not bad,
                 f"{len(rows)} app deployments" + (f", not available: {', '.join(bad)}" if bad else ""))
 
-    def placement():
-        # node_taint drains an app node and nothing moves back after the taint is removed
-        # (seen 2026-10-14); a later node_taint on the empty node would then evict nothing.
-        from tier3.collectors.kube import pod_rows
-        from tier3.vocab import APP_NODES
-        counts = {n: 0 for n in APP_NODES}
-        for p in pod_rows(kube.list_pods()):
-            if p["node"] in counts:
-                counts[p["node"]] += 1
-        empty = [n for n, c in counts.items() if c == 0]
-        return (not empty, ", ".join(f"{n} {c} pods" for n, c in counts.items())
-                + (" (run: tier3/testbed/rebalance.sh)" if empty else ""))
-
     def leftovers():
         left = injector.leftovers()
         return (not left, "none" if not left else
@@ -125,7 +131,7 @@ def run_checks(kube, prom, jaeger, workload, injector, os_url: str | None = None
 
     check("nodes", nodes)
     check("deployments", deployments)
-    check("placement", placement)
+    check("placement", lambda: placement(kube))
     check("prometheus", lambda: ((s := get(prometheus_url() + "/-/ready")[0]) == 200, f"HTTP {s}"))
     check("span-metrics", lambda: (prom.span_metrics_present(now), "traces_span_metrics_calls_total"))
     check("jaeger", lambda: (bool(jaeger.services()), f"{len(jaeger.services())} services"))

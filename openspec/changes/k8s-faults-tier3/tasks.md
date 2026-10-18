@@ -73,7 +73,7 @@
 
 ## 10. Live verification
 
-- [ ] 10.1 Free memory, run `./setup-k8s.sh`, confirm health
+- [x] 10.1 Free memory, run `./setup-k8s.sh`, confirm health (2026-10-18: restarted the existing cluster with the fixed `start.sh`; all health checks ok)
 - [ ] 10.2 Run each scenario once with Jev in `poll` mode; read each request by hand for leaks
 - [ ] 10.3 Batch with `--repeats 3`, plus at least 10 `K000` runs for the false-positive rate
 - [ ] 10.4 Print the scorecard, export for the group, export reasoning and hand-score it if Jev returned any

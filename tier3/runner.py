@@ -60,6 +60,7 @@ class Deps:
     kube_state: Callable[..., object]  # (start_s=None, end_s=None) -> KubeState
     collect: Callable[..., tuple]  # (window_end, window_s, baseline_end, baseline_s) -> (Telemetry, KubeState)
     deadman: object | None = None  # tier3.deadman.Deadman, or None to skip (tests)
+    between_runs: Callable[[], None] | None = None  # batch upkeep after each run (rebalance)
     clock: Callable[[], float] = time.time
     sleep: Callable[[float], None] = time.sleep
 
@@ -73,11 +74,14 @@ def _decision_dict(d: Decision) -> dict:
 
 
 def _usage(polls: list[dict]) -> dict:
-    """Calls, tokens and cost over every poll. Cost only when every answered call reported one."""
+    """Calls, tokens and cost over every poll. Cost only when every answered call reported one.
+    A run that never called the engine (it stopped before polling) used nothing: 0, not None."""
     tele = [p["decision"]["telemetry"] for p in polls]
     answered = [t for p, t in zip(polls, tele) if p["decision"]["status"] != DECISION_ERROR]
 
     def total(key):
+        if not polls:
+            return 0
         vals = [t.get(key) for t in answered]
         return sum(vals) if vals and all(isinstance(v, (int, float)) for v in vals) else None
     return {"engine_calls": len(polls), "answered_calls": len(answered),
@@ -268,6 +272,8 @@ def run_batch(scenarios: list[Scenario], deps: Deps, cfg: Config, results_dir: P
             if r["status"] == STATUS_CONTAMINATED:
                 stopped = f"{scn.experiment_id}: {r['message']}"
                 break
+            if deps.between_runs:
+                deps.between_runs()
         if stopped:
             break
     summary = {"run_id": run_id, "mode": cfg.mode, "repeats": repeats, "stopped_early": stopped,

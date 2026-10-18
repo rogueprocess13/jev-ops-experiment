@@ -267,3 +267,19 @@ def test_key_never_in_result(tmp_path):
     deps, _, _, _ = make(tmp_path, engine=eng)
     run_experiment(get_scenario("K001"), deps, CFG, "k", tmp_path)
     assert key not in (tmp_path / "k" / "K001.json").read_text()
+
+
+def test_batch_calls_between_runs_after_each_run(tmp_path):
+    deps, _, calls, _ = make(tmp_path)
+    deps.between_runs = lambda: calls.append("between")
+    summary = run_batch([get_scenario("K000"), get_scenario("K001")], deps, CFG, tmp_path,
+                        repeats=1, run_id="b")
+    assert len(summary["runs"]) == 2 and calls.count("between") == 2
+    assert calls.index("between") > calls.index("health")
+
+
+def test_run_that_never_called_the_engine_uses_zero_tokens(tmp_path):
+    deps, _, _, eng = make(tmp_path, healthy=False)
+    rec = run_experiment(get_scenario("K001"), deps, CFG, "r", tmp_path)
+    assert rec["status"] == "error" and eng.calls == []
+    assert rec["usage"]["input_tokens"] == 0 and rec["usage"]["cost_usd"] == 0
