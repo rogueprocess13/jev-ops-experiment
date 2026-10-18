@@ -45,6 +45,8 @@ class Config:
     recover_timeout_s: float = 300.0
     recover_poll_s: float = 30.0
     deadman_margin_s: int = 120
+    stop_at_first_detection: bool = False  # Tier 4: no-incident scenarios stop at detection too
+    extra_hold_s: float = 0.0  # Tier 4: action and recovery time added to the dead-man hold
     scrub_terms: tuple[str, ...] = ()
     versions: dict = field(default_factory=dict)
     git_commit: str | None = None
@@ -61,6 +63,10 @@ class Deps:
     collect: Callable[..., tuple]  # (window_end, window_s, baseline_end, baseline_s) -> (Telemetry, KubeState)
     deadman: object | None = None  # tier3.deadman.Deadman, or None to skip (tests)
     between_runs: Callable[[], None] | None = None  # batch upkeep after each run (rebalance)
+    # Tier 4 hooks; None keeps Tier 3 recommendation-only. after_scored(rec, decision, ctx)
+    # runs after evaluation; on_reset() runs first in `finally` and returns what it restored.
+    after_scored: Callable[[dict, Decision, dict], None] | None = None
+    on_reset: Callable[[], list[str]] | None = None
     clock: Callable[[], float] = time.time
     sleep: Callable[[float], None] = time.sleep
 
@@ -128,7 +134,7 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
 
         if scn.fault is not None:
             if deps.deadman is not None:
-                hold = max(scn.duration_s, scn.detection_window_s) + cfg.telemetry_lag_s
+                hold = max(scn.duration_s, scn.detection_window_s) + cfg.telemetry_lag_s + cfg.extra_hold_s
                 timer = deps.deadman.arm(int(hold + cfg.deadman_margin_s))
                 rec["deadman_unit"] = timer
             injected = True  # set before inject: a partial inject must still be reset
@@ -186,7 +192,7 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
                 if d.status == DECISION_OK and d.incident_detected and scored is None:
                     scored = (d, p)
                     t["t_detect"] = p["t_decision"]
-                    if scn.expected.incident:
+                    if scn.expected.incident or cfg.stop_at_first_detection:
                         break  # fault runs stop at the first detection
                 nxt = start + scn.poll_interval_s
                 if nxt > deadline:
@@ -206,11 +212,24 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
         rec["false_positive"] = false_positive_polls(polls, scn.expected)
         if all(p["decision"]["status"] == DECISION_ERROR for p in polls):
             rec["status"], rec["message"] = STATUS_ERROR, polls[-1]["decision"]["message"]
+        if deps.after_scored is not None:
+            deps.after_scored(rec, decision, {"t0": t0, "t_inject": t_inject if scn.fault else None,
+                                              "t_detect": t["t_detect"], "base_kube": base_kube,
+                                              "base_stats": base_stats, "scenario": scn})
     except Exception as e:  # noqa: BLE001 - recorded, and the reset below still runs
         rec["status"], rec["message"] = STATUS_ERROR, f"{type(e).__name__}: {e}"
         rec["traceback"] = traceback.format_exc(limit=4)
     finally:
         reset_ok = True
+        extra_restored = False
+        if deps.on_reset is not None:
+            try:
+                rec["restored_action"] = deps.on_reset()
+                extra_restored = bool(rec["restored_action"])
+            except Exception as e:  # noqa: BLE001
+                reset_ok = False
+                rec["status"] = STATUS_CONTAMINATED
+                rec["message"] = f"action reset failed: {type(e).__name__}: {e}"
         if injected:
             try:
                 rec["restored"] = deps.injector.reset()
@@ -223,7 +242,7 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
                 deps.deadman.disarm(timer)
             except Exception as e:  # noqa: BLE001
                 rec["deadman_disarm_error"] = f"{type(e).__name__}: {e}"
-        if injected and reset_ok and base_kube is not None:
+        if (injected or extra_restored) and reset_ok and base_kube is not None:
             problems = _recover(scn, deps, cfg, base_kube, base_stats)
             if problems:
                 rec["status"] = STATUS_CONTAMINATED

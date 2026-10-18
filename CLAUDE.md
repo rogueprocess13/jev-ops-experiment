@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Purpose
 
-Experimental benchmark: can Jev AI make bounded operational decisions from observations? Three tiers. **Tier 1** feeds Jev synthetic server-state data (severity, action, human review, probable cause) and compares its decision with an independently defined expected outcome. **Tier 2** injects a known fault into the OpenTelemetry Demo (Docker Compose), builds an observation from the real telemetry, and scores detection, localization, diagnosis and action separately against hidden ground truth. **Tier 3** injects the LF Edge AIOps group's ten Kubernetes faults into the demo on a local kind cluster, polls Jev for time-to-detect, and reports in the group's scorecard terms. This is **not** a production remediation system. Never add code that acts on Jev's recommendation (restart, escalate, and so on). The runners only record it. The only state-changing operations in Tier 2 and Tier 3 are the harness's own fault inject and reset.
+Experimental benchmark: can Jev AI make bounded operational decisions from observations? Four tiers. **Tier 1** feeds Jev synthetic server-state data (severity, action, human review, probable cause) and compares its decision with an independently defined expected outcome. **Tier 2** injects a known fault into the OpenTelemetry Demo (Docker Compose), builds an observation from the real telemetry, and scores detection, localization, diagnosis and action separately against hidden ground truth. **Tier 3** injects the LF Edge AIOps group's ten Kubernetes faults into the demo on a local kind cluster, polls Jev for time-to-detect, and reports in the group's scorecard terms. **Tier 4** runs the Tier 3 faults again but carries out Jev's recommended action once per run, from a fixed allowlist, and measures recovery and MTTR. This is **not** a production remediation system. Only Tier 4 acts on an engine's recommendation, only on the local kind testbed, and only through `tier4/executor.py` (see Tier 4 rules). Tiers 1, 2 and 3 only record the recommendation; their only state-changing operations are the harness's own fault inject and reset.
 
 ## Rules that must not be broken
 
@@ -45,6 +45,17 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 - **No Kubernetes Python client.** The API is reached with `requests` (`tier3/collectors/kube.py`); pod exec uses `kubectl`. Versions are pinned in `tier3/testbed/pins.env`; facts verified on the cluster go in `docs/k8s-testbed-notes.md`.
 - Tier 3 tests are offline: `FakeKube`, fake collectors, fake engine, virtual clock. Never start kind or Docker, or call Jev, from a test.
 
+## Tier 4 rules (closed-loop remediation on kind)
+
+- **Only Tier 4 acts, only through the allowlist.** `tier4/executor.py` is the only code that carries out an engine's recommendation: `scale_up` (replicas to baseline if below it, else one more, never above 3), `restart_service` (rollout restart), `rollback_change` (`kubectl rollout undo` from the cluster's own revision history). `investigate`, `escalate` and `no_action` do nothing. Never add an operation, a resource kind, a namespace or a parameter the engine can choose.
+- **Deployments in the demo namespace only.** Never nodes, Services, NetworkPolicies, StatefulSets, the load generator or the observability stack (`is_infra`). Anything else is `not_executable` with a reason, and nothing changes.
+- **One action per run, after the last poll.** The engine is not asked again after acting, so nothing from the executor or the recovery check can reach a request. The whole-path leak test in `tests/tier4/test_runner.py` covers every scenario.
+- **Rollback never reads the harness's state.** `rollback_change` uses only the cluster's rollout history, never the fault ledger, saved state or scenario.
+- **Save before act, restore exactly, in reverse order.** The target's replicas and pod template go to an `action` entry in the Tier 3 ledger before acting and are read back after. Reset restores the action first, then the fault. `python -m tier3 reset-faults`, `python -m tier4 reset-faults` and the dead-man timer handle a ledger with an action.
+- **Isolation.** Only `tier4/runner.py` and `tier4/cli.py` import the executor; nothing outside `tier4/` imports Tier 4; no Tier 4 module imports `jev.client` (`tests/tier4/test_isolation.py`). Tier 4 hooks into Tier 3's runner (`Deps.after_scored`, `Deps.on_reset`); with them unset, Tier 3 stays recommendation-only.
+- **MTTR in the group's terms.** `mttr_seconds` is fault to remediation written; `mttr_verified_seconds` is fault to the start of a 30 s run of passing service-level checks, for `recovered_by_action` only. A system that recovers on its own is `recovered_without_action`, never Jev's MTTR. Null, not invented.
+- Tier 4 tests are offline: `FakeKube`, fake undo, fake engine, virtual clock. Never call `kubectl`, kind or Jev from a test.
+
 ## Layout
 
 ```
@@ -81,8 +92,13 @@ tier3/                     Tier 3 (LF Edge Kubernetes faults on kind)
   runner.py evaluate.py report.py cli.py   lifecycle and polling; verdicts; scorecard and exports
   testbed/                 pins.env, kind.yaml, values/, create/install/health/stop/start/delete/rebalance scripts, probe_fault.py
 tests/tier3/               offline Tier 3 tests
+tier4/                     Tier 4 (closed-loop remediation on the Tier 3 cluster)
+  executor.py recovery.py  the allowlist and save/restore; service-level recovery, MTTR
+  runner.py report.py cli.py   Tier 3 lifecycle plus one action; scorecard and export
+tests/tier4/               offline Tier 4 tests
 setup.sh health-check.sh run-experiment run-all-experiments   Tier 2 entry points
 setup-k8s.sh health-check-k8s.sh run-k8s-experiment run-all-k8s-experiments   Tier 3 entry points
+run-remediation-experiment run-all-remediation-experiments   Tier 4 entry points (Tier 3 setup and health)
 ```
 
 ## Commands
@@ -110,15 +126,18 @@ setup-k8s.sh health-check-k8s.sh run-k8s-experiment run-all-k8s-experiments   Ti
 | Tier 3 batch | `./run-all-k8s-experiments [--repeats N]`, or `... K000 --repeats 10` for the control |
 | Tier 3 unstick | `python -m tier3 reset-faults` |
 | Tier 3 scorecard | `python -m tier3 scorecard results/tier3/<run-id>` (also `export-lfedge`, `export-reasoning`) |
+| Tier 4 one run | `./run-remediation-experiment K001` |
+| Tier 4 batch | `./run-all-remediation-experiments [--repeats N]` |
+| Tier 4 scorecard | `python -m tier4 scorecard results/tier4/<run-id>` (also `export-lfedge`) |
 
 `run.py` and `run-all.sh` need `JEV_API_KEY` in `.env` for the default `jev` engine. Each run makes one real model call, so use small `--runs` while developing.
 
 ## Conventions
 
 - Python 3.10+. Dependencies: `requests`, `python-dotenv`, `pyyaml`, `pytest`, `anthropic` (baseline engines only).
-- Keep it simple. Docker Compose is allowed **only** for the Tier 2 testbed and Kubernetes (a local kind cluster) **only** for the Tier 3 testbed; Tier 1 stays Python-only. Prometheus, Jaeger, OpenSearch and Grafana are the demo's own components, queried over HTTP, not something this repo deploys.
+- Keep it simple. Docker Compose is allowed **only** for the Tier 2 testbed and Kubernetes (a local kind cluster) **only** for the Tier 3 testbed (which Tier 4 reuses); Tier 1 stays Python-only. Prometheus, Jaeger, OpenSearch and Grafana are the demo's own components, queried over HTTP, not something this repo deploys.
 - Changing a scenario's expected outcome or profile is a change to the experiment, not a bug fix. Update its rationale, the README table and the tests, and say so in the commit.
-- Mark tasks done in `openspec/changes/jev-ops-experiment-v1/tasks.md` (Tier 1), `openspec/changes/otel-demo-tier2/tasks.md` (Tier 2) and `openspec/changes/k8s-faults-tier3/tasks.md` (Tier 3) as work completes.
+- Mark tasks done in `openspec/changes/jev-ops-experiment-v1/tasks.md` (Tier 1), `openspec/changes/otel-demo-tier2/tasks.md` (Tier 2), `openspec/changes/k8s-faults-tier3/tasks.md` (Tier 3) and `openspec/changes/k8s-remediation-tier4/tasks.md` (Tier 4) as work completes.
 - `results/*` is git-ignored except `.gitkeep`. Do not commit result files unless deliberately publishing a sample run, and label it as such.
 - Commit messages end with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
@@ -126,7 +145,7 @@ setup-k8s.sh health-check-k8s.sh run-k8s-experiment run-all-k8s-experiments   Ti
 
 Other people clone this repo and run it. Keep these working:
 
-- `./run-all.sh --check` on a fresh clone sets up everything and passes with no key and no network access to Jev. It runs the Tier 1, Tier 2 and Tier 3 tests (none needs Docker or a cluster). CI runs exactly this on Python 3.10-3.13 (`.github/workflows/tests.yml`).
+- `./run-all.sh --check` on a fresh clone sets up everything and passes with no key and no network access to Jev. It runs the Tier 1 to Tier 4 tests (none needs Docker or a cluster). CI runs exactly this on Python 3.10-3.13 (`.github/workflows/tests.yml`).
 - New dependencies go in `requirements.txt`, pinned.
 - New environment variables go in `.env.example` and the README table.
 - Keep code compatible with Python 3.10.

@@ -131,3 +131,17 @@ No scenario was dropped: all ten of the group's faults stay in the catalogue so 
 | K006 config_corruption | incident, cart, misconfiguration | no incident, none, none | the variable is not read; only a routine rollout |
 | K010 pvc_full | incident, cart, disk_full | no incident, cart, oom_killed | no volume to fill; the write gets the container OOMKilled once and it heals itself |
 K003, K005, K007, K008 and K009 keep their expected outcomes; their rationales now quote the measured behaviour. K005 stays an incident although users are not hurt: the rollout is broken and needs attention.
+
+## Tier 4: remediation and MTTR (change `k8s-remediation-tier4`)
+
+### How the group's harness measures MTTR (read 2026-10-18, task 1.1)
+
+Source: `lfedgeai/AIOps`, `research/agentic_aiops_architectures/code/harness/run_harness.py` and `fault_verification.py`, commit `a408708`. Read only.
+
+| Field | Their harness | Tier 4 |
+|---|---|---|
+| `mttr_seconds` | fault injection to the agent's first successful remediation write (`remediation_executed_time`; "legacy" in their code) | `t_inject` to `t_action_done` (our write accepted; for restart and rollback, the rollout complete) |
+| `mttr_verified_seconds` | fault injection to the first moment `verify_fault_resolved` passes, polled every 5 s for up to `RECOVERY_VERIFY_TIMEOUT_SEC` (120 s, capped at `fault_duration`, at least 30 s), no hold | `t_inject` to `t_recovered`: the first check of a 30 s run of passing service-level checks, every 15 s for up to 300 s |
+| `recovery_verified` | true only if a successful write targeted the injected deployment (`write_targeted_expected`) and the check passed | true only for `recovered_by_action` |
+| What the check looks at | the injected target's spec and readiness, per fault type: `scale_zero` replicas >= 1 and ready; `config_corruption`, `memory_limit`, `readiness_probe_fail` the fault's value gone and ready >= 1; `network_partition` their policy gone; `dependency_removal`, `replica_overload` ready >= 1; `kill_pod` target pods Running and Ready; any other type (`pvc_full`, `node_taint`) never passes | every Deployment at baseline availability and rollout complete, every app pod Ready, no service deviating from baseline; fault-agnostic, so `pvc_full` and `node_taint` can verify, and a fixed spec with a still-erroring service does not |
+| Fault while verifying | stays injected until `fault_duration` after injection, then the harness reverts it | stays injected for the whole recovery window, then reset |

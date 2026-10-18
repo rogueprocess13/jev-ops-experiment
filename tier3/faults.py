@@ -314,7 +314,9 @@ def reset_faults(kube, ledger: Path = DEFAULT_LEDGER) -> list[str]:
     changed = []
     if ledger.exists():
         entry = json.loads(ledger.read_text())
-        changed += restore(kube, entry["saved"])
+        if entry.get("action"):  # Tier 4: undo the action first, then the fault
+            changed += restore(kube, entry["action"]["saved"])
+        changed += restore(kube, entry.get("saved") or {})
         ledger.unlink()
         changed.append(f"ledger {ledger} cleared")
     for p in kube.list_network_policies():

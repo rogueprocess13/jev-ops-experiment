@@ -18,7 +18,7 @@ Prepared for discussion in the LF Edge AIOps forum.
 | Infrastructure | None (Python only) | Docker Compose | A local four-node kind cluster |
 | Run with | `./run-all.sh` (this page, below) | `./run-experiment F001` ([Tier 2](#tier-2-opentelemetry-demo)) | `./run-k8s-experiment K001` ([Tier 3](#tier-3-kubernetes-faults-on-kind)) |
 
-The tiers share only the Jev client (`jev/client.py`); Tier 3 also reuses Tier 2's collectors and scrubber. Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tiers 2 and 3 have their own sections.
+The tiers share only the Jev client (`jev/client.py`); Tier 3 also reuses Tier 2's collectors and scrubber. [Tier 4](#tier-4-closed-loop-remediation-on-kind) reruns Tier 3's faults on the same cluster and carries out Jev's recommended action to measure MTTR. Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tiers 2, 3 and 4 have their own sections.
 
 ## Quick start
 
@@ -400,7 +400,7 @@ The tests need no network and no API key. They cover scenario definitions, gener
 
 ## Tier 3: Kubernetes faults on kind
 
-> Status: code and offline tests are written. The cluster facts (kind and chart versions, NetworkPolicy enforcement, chart value keys) and the behaviour of every fault are **not yet verified on a real cluster** (task group 1 in `openspec/changes/k8s-faults-tier3/tasks.md`), and no live run exists yet. Expected outcomes are provisional until then.
+> Status: done. Every fault was verified on the kind cluster (`docs/k8s-testbed-notes.md`), and the first full live batch is written up in [docs/results-2026-10-18-tier3-jev.md](docs/results-2026-10-18-tier3-jev.md).
 
 ### Why it exists
 
@@ -480,6 +480,34 @@ A polling run makes up to 16 Jev calls (one per poll). The scorecard shows count
 
 Notes on the testbed, the verified facts and every dropped scenario are in `docs/k8s-testbed-notes.md`.
 
+## Tier 4: closed-loop remediation on kind
+
+> Status: code and offline tests are written; the action probes on the cluster and the live runs are task groups 1 and 6 in `openspec/changes/k8s-remediation-tier4/tasks.md`.
+
+Tier 3 reports remediation executed, MTTR and recovery verified as "not measured", because it never acts. Tier 4 runs the same scenarios (`K000` to `K010`) on the same cluster, and after the first poll that reports an incident it carries out Jev's recommended action on Jev's named component, once. Then it watches whether the system recovers. This is the only tier that acts on an engine's recommendation.
+
+| Jev's action | What the harness does |
+|---|---|
+| `scale_up` | the named Deployment's replicas to its baseline count if below it, else one more (never above 3) |
+| `restart_service` | rollout restart of the named Deployment |
+| `rollback_change` | `kubectl rollout undo` to the previous revision in the cluster's own history (never the harness's saved state) |
+| `investigate`, `escalate`, `no_action` | nothing: "not auto-remediated" |
+
+Only Deployments in the demo namespace can be acted on; a node, `none` or an infrastructure name is "not executable" and nothing changes. The target's state is saved to the fault ledger before acting, and reset restores the action and then the fault. The fault stays injected while recovery is watched, so only the action can fix it.
+
+**Recovered** means every Deployment is back at baseline availability with its rollout complete, every application pod is Ready and no service deviates from baseline, for 30 s in a row, within 300 s. Each run is `recovered_by_action`, `recovered_without_action` (the system was already back, or healed on its own) or `not_recovered`.
+
+**MTTR, as the LF Edge harness defines it** (`run_harness.py`, read 2026-10-18): `mttr_seconds` is fault to remediation written; `mttr_verified_seconds` is fault to recovery verified, for recovered-by-action runs only. Our recovery check is service-level and must hold for 30 s; theirs checks the injected target's spec and readiness per fault type, with no hold, and cannot verify `kill_pod`, `pvc_full` or `node_taint`. Their agents choose and write their own fixes; ours are Jev's four answers carried out by the harness.
+
+```bash
+./setup-k8s.sh && ./health-check-k8s.sh   # the Tier 3 cluster
+./run-remediation-experiment K001         # one run
+./run-all-remediation-experiments K001 K002 K003 K004 K005 K006 K007 K008 K009 K010 --repeats 3
+python -m tier4 scorecard results/tier4/<run-id>
+python -m tier4 export-lfedge results/tier4/<run-id> -o lfedge.jsonl
+python -m tier4 reset-faults              # undo a recorded action, then the fault
+```
+
 ## Docker (optional)
 
 No Python needed on your machine:
@@ -523,7 +551,7 @@ jev/client.py             Jev adapter (the only Jev-specific code)
 llm/                      baseline engines: Claude (API or claude CLI), Ollama
 evaluation/evaluator.py   comparison, aggregation, summary text
 tests/                    offline unit tests
-tier2/ tier3/             Tiers 2 and 3 (see their sections and CLAUDE.md)
+tier2/ tier3/ tier4/      Tiers 2, 3 and 4 (see their sections and CLAUDE.md)
 docs/jev-api-notes.md     Jev API notes
 docs/llm-baseline-notes.md API notes for the baseline engines
 docs/results-2026-10-05-tier1-baselines.md  first four-engine comparison, with test machine
