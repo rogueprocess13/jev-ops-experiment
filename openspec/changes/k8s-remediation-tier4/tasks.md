@@ -41,7 +41,7 @@
 
 ## 6. Live runs
 
-- [ ] 6.1 Run each scenario once with Jev through Tier 4; read each request by hand for leaks, and check every action's record and restore
+- [x] 6.1 Run each scenario once with Jev through Tier 4; read each request by hand for leaks, and check every action's record and restore (2026-10-18: `results/tier4/20261018-210528-2703` K000, `20261018-212756-f595` K001-K010; a session reset killed the first pass after K000)
 - [ ] 6.2 Batch `K001` to `K010` with `--repeats 3`, plus at least 10 `K000` runs
 - [ ] 6.3 Print the scorecard and the LF Edge export
 - [ ] 6.4 Write `docs/results-<date>-tier4-jev.md` from the run records only, stating what is not comparable with the group's agents; stop the cluster
