@@ -58,6 +58,8 @@ A node, `none`, an infrastructure name (`is_infra` from Tier 3, which covers the
 
 **D11. Policy text.** `CLAUDE.md` changes from "Never add code that acts on Jev's recommendation" to: only Tier 4 acts on an engine's recommendation, only on the local kind testbed, only through `tier4/executor.py`'s allowlist, one action per run, with save-before-act and exact restore. Tiers 1 to 3 stay recommendation-only.
 
+**D12. What Tier 4's MTTR is, and the Opus baseline.** Tier 4 measures **single-shot recommendation MTTR**: one answer, carried out once by the harness, no feedback and no retry. It is not operational MTTR (an engineer or agent who investigates, tries, checks and retries), and every report labels it so. To compare engines fairly, a Claude Opus engine (`claude-opus-5-5`) answers the same four questions from the same observation through the same `AIOpsEngine` interface, and its answer goes through the same executor and recovery check (task group 7). An agentic mode, where a model calls tools, takes several steps and verifies its own fix, would measure something closer to operational MTTR and to the LF Edge group's agents; Jev cannot run in it, so it would be a separate change, reported separately as "agentic MTTR" and never set against Jev's single-shot figures.
+
 ## Risks / Trade-offs
 
 - [An action on the wrong component disturbs a healthy service, e.g. a restart of `frontend` during a cart fault] → Bounded to one reversible operation, saved and restored in `finally`; the disturbance is recorded and is part of what Tier 4 measures.
