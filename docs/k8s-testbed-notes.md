@@ -153,3 +153,34 @@ Source: `lfedgeai/AIOps`, `research/agentic_aiops_architectures/code/harness/run
 ### A pass can relapse (2026-10-18)
 
 Probe K004 (`network_partition` on cart) with `restart_service` on cart: every check passed for 60 s after the restart, so the first version of the watch stopped and called the run recovered. Prometheus afterwards showed frontend p95 at 15 s and checkout errors on 100 % of calls in the 120 s windows ending 120 and 180 s after the restart: the new cart pods take no new connections under the policy, and the callers' failures reached the span metrics only after their timeouts and the 60 s sample interval. The watch now runs the full 360 s, recovery needs the final passing run to reach the end, and an earlier pass that fails later is recorded as a relapse. The 10 probes run with the early stop were discarded too (`results/tier4/probe-discarded-early-stop/`).
+
+### Action probes (tasks 1.3 to 1.5, 2026-10-18)
+
+`python -m tier4 probe <ID> <action> <component>` runs the real Tier 4 path with a scripted engine (always "incident", the given action and component; no Jev). Each fault on its Tier 3 target, each allowlisted action on that target, plus `restart_service` and `rollback_change` on `frontend` during the K000 control. 32 probes, all `ok`, every action saved, read back and restored, no ledger left. Records in `results/tier4/probe/`; the log is `results/tier4/probe-matrix.log`. MTTR is fault to action done; verified is fault to the start of the final passing run (must reach the end of the 360 s watch). Self is the self-recovery time when the check just before acting already passed.
+
+| Fault (target) | `scale_up` | `restart_service` | `rollback_change` | Reading |
+|---|---|---|---|---|
+| K001 scale_zero (cart) | by action, MTTR 16 s, verified 106 s | not recovered | not recovered | fixed by `scale_up` only |
+| K002 kill_pod (cart) | by action, verified 121 s | without action, self 17 s | without action, self 16 s | heals itself; "by action" when the new pod is not Ready yet at the pre-action check |
+| K003 memory_limit (cart) | not recovered | not recovered (rollout never completes, 136 s) | by action, verified 18 s | fixed by `rollback_change` only |
+| K004 network_partition (cart) | by action, verified 31 s | not recovered, relapsed | not recovered | latent: nothing removes the policy; restart and rollback replace cart's pods, which then take no new connections, so they turn the latent fault into an outage (checkout and frontend fail about 2 minutes after) |
+| K005 readiness_probe_fail (cart) | not recovered | not recovered (136 s) | by action, verified 18 s | fixed by `rollback_change` only |
+| K006 config_corruption (cart) | by action, verified 31 s | without action, self 16 s | without action, self 15 s | no effect beyond its own rolling restart; heals itself |
+| K007 dependency_removal (valkey-cart) | by action, MTTR 16 s, verified 91 s | not recovered | not recovered | fixed by `scale_up` only |
+| K008 replica_overload (cart) | by action, MTTR 16 s, verified 121 s | not recovered | not recovered | fixed by `scale_up` only; one cart replica copes with the tripled load |
+| K009 node_taint (jev-worker2) | by action, verified 166 s | by action, verified 80 s | without action, self 17 s | heals itself by rescheduling onto jev-worker3 |
+| K010 pvc_full (cart) | by action, verified 33 s | without action, self 18 s | without action, self 16 s | heals itself (the write is OOMKilled, the container restarts) |
+| K000 control (frontend) | | no disturbance (25 of 25 checks passed) | no disturbance | a gradual rollout on a healthy Deployment is invisible to users |
+
+What follows for the live runs:
+
+- **Right action, right component, one fix each.** Replica faults (K001, K007, K008) are fixed only by `scale_up` on the right Deployment; template faults (K003, K005) only by `rollback_change`. `restart_service` fixed nothing in any probe. No allowlisted action fixes K004.
+- **Self-healing faults (K002, K006, K009, K010) do not measure remediation.** Whether a run is "by action" or "without action" depends only on whether the system is already passing at the check just before acting (about 16 to 20 s after injection). Report them separately and never count them towards an engine's verified MTTR.
+- **Verified MTTR equals MTTR when the fix lands before the fault's errors reach the span metrics** (K003, K005 at about 18 s): the service part of the check has not seen the errors yet, so it rests on Kubernetes state. Replica faults show errors first and verify 75 to 105 s after the fix (metrics every 60 s, 120 s window).
+- **`disturbed_healthy_system` is clean only on K000.** On a no-incident fault scenario a failing check after the action can come from the fault itself (K002, K006, K010) or from the action (K004).
+- **Rollout history (1.4).** `kubectl rollout undo` on cart picked the previous ReplicaSet revision every time (cart's revision grew from 80 to 132 over the matrix, from the faults, restores, restarts and rebalances); on the healthy `frontend` it rolled back to the revision `rebalance.sh` left (revision 12), which differs only in the restart annotation, so nothing visible changed. The first records stored the revision before the controller bumped it; fixed in `308eeca`.
+- **No self-describing markers (1.5).** A rollout restart writes only `kubectl.kubernetes.io/restartedAt` on the pod template (read back by the executor); `kubectl rollout undo` copies the previous ReplicaSet's template and adds nothing. Neither names the fault or the experiment, and the harness's restore removes the restart annotation again.
+
+### Recovery-check noise on the healthy cluster (task 1.6, 2026-10-18)
+
+`python -m tier4 probe K000 no_action none`: no fault, no action, the recovery check run for the full 360 s. 25 of 25 checks passed (`results/tier4/noise/`). Together with the two K000 frontend probes (25 of 25 each), 75 checks on a healthy cluster and none failed, so the check does not fail on noise at the Tier 2 deviation thresholds. Nothing was tuned.

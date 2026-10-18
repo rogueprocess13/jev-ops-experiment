@@ -2,11 +2,11 @@
 
 - [x] 1.1 Read the LF Edge harness (`lfedgeai/AIOps`, `research/agentic_aiops_architectures/code/harness/run_harness.py`) for how it sets `remediation_executed`, `recovery_verified`, `mttr_seconds` and `mttr_verified_seconds`, and whether its fault stays injected during recovery; record it in `docs/k8s-testbed-notes.md` and adjust the D6 export mapping if needed (2026-10-18: mttr = fault to first write, mttr_verified = fault to target check passing; D6, D7 and the recovery spec aligned)
 - [x] 1.2 Start the cluster (`tier3/testbed/start.sh`), confirm health, and record `revisionHistoryLimit` and the current revision of every demo Deployment (2026-10-18: healthy; every Deployment revisionHistoryLimit 10; cart at revision 38, other app Deployments 8-9)
-- [ ] 1.3 By hand, for each fault on its Tier 3 target, apply each allowlisted action on the right component (`scale_up`, `restart_service`, `rollback_change`) and record whether and when the service-level recovery check (D5) would pass; note which faults no allowlisted action can fix (expected: `network_partition`, `node_taint`)
-- [ ] 1.4 By hand, apply `restart_service` and `rollback_change` to an unrelated healthy Deployment (`frontend`) and record the disturbance and the revision `rollout undo` picks after `rebalance.sh` has run
-- [ ] 1.5 Confirm that `kubectl rollout undo` and a rollout restart leave no annotation or label that names the fault or the experiment, and that the harness's exact restore brings the Deployment back after each action
-- [ ] 1.6 Measure the recovery check's noise on the healthy cluster: run it for 360 s with no fault and record any failing checks; tune nothing that the scenarios' expected answers depend on
-- [ ] 1.7 Write the findings to `docs/k8s-testbed-notes.md` (a Tier 4 section: actions per fault, recovery times with the right action, history behaviour, noise)
+- [x] 1.3 By hand, for each fault on its Tier 3 target, apply each allowlisted action on the right component (`scale_up`, `restart_service`, `rollback_change`) and record whether and when the service-level recovery check (D5) would pass; note which faults no allowlisted action can fix (expected: `network_partition`, `node_taint`)
+- [x] 1.4 By hand, apply `restart_service` and `rollback_change` to an unrelated healthy Deployment (`frontend`) and record the disturbance and the revision `rollout undo` picks after `rebalance.sh` has run
+- [x] 1.5 Confirm that `kubectl rollout undo` and a rollout restart leave no annotation or label that names the fault or the experiment, and that the harness's exact restore brings the Deployment back after each action
+- [x] 1.6 Measure the recovery check's noise on the healthy cluster: run it for 360 s with no fault and record any failing checks; tune nothing that the scenarios' expected answers depend on (25 of 25 checks passed over 360 s; 75 of 75 with the two K000 frontend probes)
+- [x] 1.7 Write the findings to `docs/k8s-testbed-notes.md` (a Tier 4 section: actions per fault, recovery times with the right action, history behaviour, noise)
 
 ## 2. Executor
 
