@@ -59,14 +59,18 @@ def watch(start: float, stats: Callable[[float, int], dict], kube_state: Callabl
           base_stats: dict, base_kube: KubeState, clock: Callable[[], float],
           sleep: Callable[[float], None], cfg: RecoveryConfig,
           prior: dict | None = None) -> dict:
-    """Check every `check_s` from `start` until checks pass for `hold_s` in a row or
-    `window_s` ends. Returns every check, `t_recovered` (first check of the passing run)
-    and `t_recovery_verified` (the check that completed the hold), as epoch seconds.
-    `prior` is a check taken before the action; if it passed, a passing run starts there,
-    so a system that was already back counts as recovered without the action (D7)."""
+    """Check every `check_s` from `start` to the end of `window_s`. Recovered only when
+    the last run of passing checks reaches the end of the window and lasts at least
+    `hold_s`: a fault can come back after a short pass (seen on kind: after a restart
+    under network_partition, errors began about 2 minutes later). Returns every check,
+    `t_recovered` (first check of that final run), `t_recovery_verified` (the check that
+    completed its hold), `relapsed` (a run met the hold and later failed), as epoch seconds.
+    `prior` is a check taken before the action; if the final run starts there, the system
+    was already back and counts as recovered without the action (D7)."""
     checks = [prior] if prior else []
     run_start = prior["t"] if prior and prior["ok"] else None
     from_prior = run_start is not None
+    held_at, relapsed = None, False
     deadline = start + cfg.window_s
     wait = start - clock()
     if wait > 0:
@@ -76,17 +80,21 @@ def watch(start: float, stats: Callable[[float, int], dict], kube_state: Callabl
         c = check(stats, kube_state, base_stats, base_kube, now, cfg)
         checks.append(c)
         if not c["ok"]:
-            run_start, from_prior = None, False
+            relapsed = relapsed or held_at is not None
+            run_start, from_prior, held_at = None, False, None
         else:
             run_start = now if run_start is None else run_start
-            if now - run_start >= cfg.hold_s:
-                return {"checks": checks, "t_recovered": run_start, "t_recovery_verified": now,
-                        "before_action": from_prior}
+            if held_at is None and now - run_start >= cfg.hold_s:
+                held_at = now
         nxt = now + cfg.check_s
         if nxt > deadline:
-            return {"checks": checks, "t_recovered": None, "t_recovery_verified": None,
-                    "before_action": False}
+            break
         sleep(nxt - clock())
+    if held_at is None:
+        return {"checks": checks, "t_recovered": None, "t_recovery_verified": None,
+                "before_action": False, "relapsed": relapsed}
+    return {"checks": checks, "t_recovered": run_start, "t_recovery_verified": held_at,
+            "before_action": from_prior, "relapsed": relapsed}
 
 
 def check(stats: Callable[[float, int], dict], kube_state: Callable[[], KubeState],

@@ -54,14 +54,27 @@ def run(seq, prior=None, start=0.0):
     return watch(start, stats, lambda: BASE, OK, BASE, clock, clock.sleep, RecoveryConfig(), prior=prior)
 
 
-def test_hold_of_60s_needed():
-    w = run([False, True, True, True, True, True])
-    assert w["t_recovered"] == 15.0 and w["t_recovery_verified"] == 75.0
+def test_must_hold_to_the_end_of_the_window():
+    w = run([False, True])  # fails at 0 s, passes from 15 s to 360 s
+    assert w["t_recovered"] == 15.0 and w["t_recovery_verified"] == 75.0 and not w["relapsed"]
 
 
-def test_pass_then_fail_resets_the_run():
-    w = run([True, False, True, True, True, True, True])
-    assert w["t_recovered"] == 30.0
+def test_relapse_after_a_held_pass_is_not_recovered():
+    seq = [True] * 6 + [False] * 30  # held 0-75 s, then fails to the end
+    w = run(seq)
+    assert w["t_recovered"] is None and w["relapsed"]
+
+
+def test_relapse_then_final_recovery():
+    seq = [True] * 6 + [False] * 4 + [True] * 30
+    w = run(seq)
+    assert w["t_recovered"] == 150.0 and w["relapsed"]
+
+
+def test_final_run_shorter_than_hold_is_not_recovered():
+    seq = [False] * 22 + [True] * 10  # passes only from 330 s: 30 s before the end
+    w = run(seq)
+    assert w["t_recovered"] is None
 
 
 def test_window_ends():
@@ -70,13 +83,13 @@ def test_window_ends():
 
 
 def test_prior_passing_check_counts_as_already_recovered():
-    w = run([True] * 5, prior={"t": -5.0, "ok": True, "problems": []}, start=10.0)
+    w = run([True], prior={"t": -5.0, "ok": True, "problems": []}, start=10.0)
     assert w["t_recovered"] == -5.0 and w["before_action"]
     assert outcome(True, True, w["before_action"]) == RECOVERED_WITHOUT_ACTION
 
 
 def test_failing_check_after_prior_means_by_action():
-    w = run([False] + [True] * 5, prior={"t": -5.0, "ok": True, "problems": []}, start=10.0)
+    w = run([False, True], prior={"t": -5.0, "ok": True, "problems": []}, start=10.0)
     assert not w["before_action"] and outcome(True, True, w["before_action"]) == RECOVERED_BY_ACTION
 
 

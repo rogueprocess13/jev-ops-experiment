@@ -84,6 +84,7 @@ def run_experiment(scn: Scenario, deps: Tier4Deps, cfg: Config, run_id: str,
         rem["remediation_executed"] = act["executed"]
         rem["recovery_verified"] = by_action
         rem["self_recovered"] = rem["outcome"] == RECOVERED_WITHOUT_ACTION
+        rem["relapsed"] = w["relapsed"]
         rem["timing"] = {
             "t_action_start": act["t_action_start"], "t_action_done": act["t_action_done"],
             "t_recovered": t_rec, "t_recovery_verified": t_ver,

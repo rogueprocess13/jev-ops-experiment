@@ -12,11 +12,15 @@ A recovery check SHALL pass only when every demo Deployment is at or above its b
 - **THEN** the check fails
 
 ### Requirement: Recovery held for a period within a window
-Checks SHALL run every 15 s, starting when the action completes or, with no executed action, at the detecting poll, for up to 360 s. Recovery SHALL count only when checks pass for 60 s in a row. The fault SHALL stay injected for the whole window.
+Checks SHALL run every 15 s, starting when the action completes or, with no executed action, at the detecting poll, for the full 360 s. Recovery SHALL count only when the final run of passing checks reaches the end of the window and lasts at least 60 s. A run that lasted 60 s and later failed SHALL set `relapsed: true`. The fault SHALL stay injected for the whole window.
 
 #### Scenario: One passing check then a failure
 - **WHEN** a check passes and the next fails
 - **THEN** recovery is not counted and checking continues
+
+#### Scenario: Relapse
+- **WHEN** checks pass from 0 s to 75 s and fail from 90 s to the end
+- **THEN** the outcome is `not_recovered` and `relapsed` is true
 
 #### Scenario: Window ends
 - **WHEN** no 60 s run of passing checks occurs within 360 s

@@ -28,6 +28,7 @@ def _rem_block(recs: list[dict]) -> dict:
         "by_action": sum(1 for x in rem if x["outcome"] == RECOVERED_BY_ACTION),
         "without_action": sum(1 for x in rem if x["outcome"] == RECOVERED_WITHOUT_ACTION),
         "not_recovered": sum(1 for x in rem if x["outcome"] == NOT_RECOVERED),
+        "relapsed": sum(1 for x in rem if x.get("relapsed")),
         "mttr": _spread([x["mttr_seconds"] for x in t if x["mttr_seconds"] is not None]),
         "mttr_verified": _spread([x["mttr_verified_seconds"] for x in t
                                   if x["mttr_verified_seconds"] is not None]),
@@ -59,7 +60,7 @@ def format_scorecard(records: list[dict]) -> str:
             if not x.startswith(("Remediation executed:", "MTTR:", "Recovery verified:"))]
     data = scorecard_data(records)
     cols = ["scenario", "fault runs", "executed", "not executable", "recovered by action",
-            "recovered without action", "not recovered", "MTTR median (min-max) s",
+            "recovered without action", "not recovered", "relapsed", "MTTR median (min-max) s",
             "verified MTTR median (min-max) s", "self-recovery median s", "false-alarm actions",
             "disturbed healthy"]
     lines = ["", "## Remediation", "", "| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
@@ -67,7 +68,7 @@ def format_scorecard(records: list[dict]) -> str:
     def row(name, x):
         f = x["fault_runs"]
         return (f"| {name} | {f} | {x['executed']}/{f} | {x['not_executable']}/{f} | {x['by_action']}/{f} | "
-                f"{x['without_action']}/{f} | {x['not_recovered']}/{f} | {_med(x['mttr'])} | "
+                f"{x['without_action']}/{f} | {x['not_recovered']}/{f} | {x['relapsed']}/{f} | {_med(x['mttr'])} | "
                 f"{_med(x['mttr_verified'])} | {_med(x['self_recovery'])} | "
                 f"{_frac((x['false_alarm_actions'], x['control_runs']))} | "
                 f"{_frac((x['disturbed'], x['control_runs']))} |")
@@ -77,8 +78,9 @@ def format_scorecard(records: list[dict]) -> str:
     lines += [
         "",
         "MTTR is fault to remediation written (the LF Edge `mttr_seconds`); verified MTTR is fault to "
-        "the start of a 60 s run of passing service-level checks, for recovered-by-action runs only "
-        "(`mttr_verified_seconds`). Fault-run columns count incident scenarios; false-alarm columns "
+        "the start of the final run of passing service-level checks (at least 60 s, lasting to the end "
+        "of the 360 s window), for recovered-by-action runs only (`mttr_verified_seconds`). Relapsed: "
+        "a run of passing checks met the hold and later failed. Fault-run columns count incident scenarios; false-alarm columns "
         "count the no-incident scenarios and the control.",
     ]
     return "\n".join(head + lines)
