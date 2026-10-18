@@ -8,5 +8,6 @@ COPY scenarios scenarios
 COPY generator generator
 COPY jev jev
 COPY evaluation evaluation
+COPY llm llm
 # Credentials are passed at run time (-e JEV_API_KEY=...). Results go to /app/results.
 ENTRYPOINT ["python", "run.py"]
