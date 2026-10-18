@@ -22,6 +22,10 @@ def test_replaced_and_terminating_pods_pass():
     assert problems(OK, OK, ks(pods=pods), BASE) == []
 
 
+def test_missing_telemetry_fails():
+    assert problems({}, OK, ks(), BASE) == ["no service telemetry in the window"]
+
+
 def test_errors_or_missing_replicas_fail():
     assert problems(BAD, OK, ks(), BASE) == ["service frontend deviates"]
     assert problems(OK, OK, ks(avail=0), BASE)
@@ -50,29 +54,29 @@ def run(seq, prior=None, start=0.0):
     return watch(start, stats, lambda: BASE, OK, BASE, clock, clock.sleep, RecoveryConfig(), prior=prior)
 
 
-def test_hold_of_30s_needed():
-    w = run([False, True, True, True])
-    assert w["t_recovered"] == 15.0 and w["t_recovery_verified"] == 45.0
+def test_hold_of_60s_needed():
+    w = run([False, True, True, True, True, True])
+    assert w["t_recovered"] == 15.0 and w["t_recovery_verified"] == 75.0
 
 
 def test_pass_then_fail_resets_the_run():
-    w = run([True, False, True, True, True])
+    w = run([True, False, True, True, True, True, True])
     assert w["t_recovered"] == 30.0
 
 
 def test_window_ends():
     w = run([False])
-    assert w["t_recovered"] is None and len(w["checks"]) == 21  # 0..300 s every 15 s
+    assert w["t_recovered"] is None and len(w["checks"]) == 25  # 0..360 s every 15 s
 
 
 def test_prior_passing_check_counts_as_already_recovered():
-    w = run([True, True, True], prior={"t": -5.0, "ok": True, "problems": []}, start=10.0)
+    w = run([True] * 5, prior={"t": -5.0, "ok": True, "problems": []}, start=10.0)
     assert w["t_recovered"] == -5.0 and w["before_action"]
     assert outcome(True, True, w["before_action"]) == RECOVERED_WITHOUT_ACTION
 
 
 def test_failing_check_after_prior_means_by_action():
-    w = run([False, True, True, True], prior={"t": -5.0, "ok": True, "problems": []}, start=10.0)
+    w = run([False] + [True] * 5, prior={"t": -5.0, "ok": True, "problems": []}, start=10.0)
     assert not w["before_action"] and outcome(True, True, w["before_action"]) == RECOVERED_BY_ACTION
 
 

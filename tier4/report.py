@@ -77,7 +77,7 @@ def format_scorecard(records: list[dict]) -> str:
     lines += [
         "",
         "MTTR is fault to remediation written (the LF Edge `mttr_seconds`); verified MTTR is fault to "
-        "the start of a 30 s run of passing service-level checks, for recovered-by-action runs only "
+        "the start of a 60 s run of passing service-level checks, for recovered-by-action runs only "
         "(`mttr_verified_seconds`). Fault-run columns count incident scenarios; false-alarm columns "
         "count the no-incident scenarios and the control.",
     ]

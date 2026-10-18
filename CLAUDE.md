@@ -53,7 +53,7 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 - **Rollback never reads the harness's state.** `rollback_change` uses only the cluster's rollout history, never the fault ledger, saved state or scenario.
 - **Save before act, restore exactly, in reverse order.** The target's replicas and pod template go to an `action` entry in the Tier 3 ledger before acting and are read back after. Reset restores the action first, then the fault. `python -m tier3 reset-faults`, `python -m tier4 reset-faults` and the dead-man timer handle a ledger with an action.
 - **Isolation.** Only `tier4/runner.py` and `tier4/cli.py` import the executor; nothing outside `tier4/` imports Tier 4; no Tier 4 module imports `jev.client` (`tests/tier4/test_isolation.py`). Tier 4 hooks into Tier 3's runner (`Deps.after_scored`, `Deps.on_reset`); with them unset, Tier 3 stays recommendation-only.
-- **MTTR in the group's terms.** `mttr_seconds` is fault to remediation written; `mttr_verified_seconds` is fault to the start of a 30 s run of passing service-level checks, for `recovered_by_action` only. A system that recovers on its own is `recovered_without_action`, never Jev's MTTR. Null, not invented.
+- **MTTR in the group's terms.** `mttr_seconds` is fault to remediation written; `mttr_verified_seconds` is fault to the start of a 60 s run of passing service-level checks, for `recovered_by_action` only. A system that recovers on its own is `recovered_without_action`, never Jev's MTTR. Null, not invented.
 - Tier 4 tests are offline: `FakeKube`, fake undo, fake engine, virtual clock. Never call `kubectl`, kind or Jev from a test.
 
 ## Layout

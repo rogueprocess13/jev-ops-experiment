@@ -495,9 +495,9 @@ Tier 3 reports remediation executed, MTTR and recovery verified as "not measured
 
 Only Deployments in the demo namespace can be acted on; a node, `none` or an infrastructure name is "not executable" and nothing changes. The target's state is saved to the fault ledger before acting, and reset restores the action and then the fault. The fault stays injected while recovery is watched, so only the action can fix it.
 
-**Recovered** means every Deployment is back at baseline availability with its rollout complete, every application pod is Ready and no service deviates from baseline, for 30 s in a row, within 300 s. Each run is `recovered_by_action`, `recovered_without_action` (the system was already back, or healed on its own) or `not_recovered`.
+**Recovered** means every Deployment is back at baseline availability with its rollout complete, every application pod is Ready and no service deviates from baseline (span metrics over 120 s, which arrive every 60 s; no data fails the check), for 60 s in a row, within 360 s. Each run is `recovered_by_action`, `recovered_without_action` (the system was already back, or healed on its own) or `not_recovered`.
 
-**MTTR, as the LF Edge harness defines it** (`run_harness.py`, read 2026-10-18): `mttr_seconds` is fault to remediation written; `mttr_verified_seconds` is fault to recovery verified, for recovered-by-action runs only. Our recovery check is service-level and must hold for 30 s; theirs checks the injected target's spec and readiness per fault type, with no hold, and cannot verify `kill_pod`, `pvc_full` or `node_taint`. Their agents choose and write their own fixes; ours are Jev's four answers carried out by the harness.
+**MTTR, as the LF Edge harness defines it** (`run_harness.py`, read 2026-10-18): `mttr_seconds` is fault to remediation written; `mttr_verified_seconds` is fault to recovery verified, for recovered-by-action runs only. Our recovery check is service-level and must hold for 60 s; theirs checks the injected target's spec and readiness per fault type, with no hold, and cannot verify `kill_pod`, `pvc_full` or `node_taint`. Their agents choose and write their own fixes; ours are Jev's four answers carried out by the harness.
 
 ```bash
 ./setup-k8s.sh && ./health-check-k8s.sh   # the Tier 3 cluster

@@ -5,7 +5,7 @@
 - [ ] 1.3 By hand, for each fault on its Tier 3 target, apply each allowlisted action on the right component (`scale_up`, `restart_service`, `rollback_change`) and record whether and when the service-level recovery check (D5) would pass; note which faults no allowlisted action can fix (expected: `network_partition`, `node_taint`)
 - [ ] 1.4 By hand, apply `restart_service` and `rollback_change` to an unrelated healthy Deployment (`frontend`) and record the disturbance and the revision `rollout undo` picks after `rebalance.sh` has run
 - [ ] 1.5 Confirm that `kubectl rollout undo` and a rollout restart leave no annotation or label that names the fault or the experiment, and that the harness's exact restore brings the Deployment back after each action
-- [ ] 1.6 Measure the recovery check's noise on the healthy cluster: run it for 300 s with no fault and record any failing checks; tune nothing that the scenarios' expected answers depend on
+- [ ] 1.6 Measure the recovery check's noise on the healthy cluster: run it for 360 s with no fault and record any failing checks; tune nothing that the scenarios' expected answers depend on
 - [ ] 1.7 Write the findings to `docs/k8s-testbed-notes.md` (a Tier 4 section: actions per fault, recovery times with the right action, history behaviour, noise)
 
 ## 2. Executor
@@ -19,7 +19,7 @@
 ## 3. Recovery
 
 - [x] 3.1 `tier4/recovery.py`: the service-level check (D5) from Kubernetes state and service stats, ignoring replaced pods and restarts
-- [x] 3.2 Hold period (30 s) and window (300 s); `t_recovered`, `t_recovery_verified`, MTTR, verified MTTR, time to remediate (D6); `null` when not measurable
+- [x] 3.2 Hold period (60 s) and window (360 s), stats over 120 s; `t_recovered`, `t_recovery_verified`, MTTR, verified MTTR, time to remediate (D6); `null` when not measurable
 - [x] 3.3 Outcomes `recovered_by_action`, `recovered_without_action`, `not_recovered` (D7); `action_on_false_alarm` and `disturbed_healthy_system` (D8) (outcome uses whether the passing run began at the pre-action check, not timestamps)
 - [x] 3.4 Offline tests with a virtual clock: early pass then fail, window end, self-healing, recovery before the action completes, false-alarm action that disturbs
 
@@ -37,7 +37,7 @@
 - [x] 5.1 `CLAUDE.md`: narrow the "never act" rule to Tier 4 (D11), add a Tier 4 rules section, layout and commands; Tier 1 to 3 rules unchanged
 - [x] 5.2 `README.md`: Tier 4 section with the allowlist, what MTTR measures here, and what is and is not comparable with the group's agents
 - [x] 5.3 New settings, if any, in `.env.example` and the README table (none needed: Tier 4 reuses the Tier 3 settings)
-- [ ] 5.4 Confirm `./run-all.sh --check` runs the Tier 4 tests and CI passes on Python 3.10 to 3.13; Tier 1 to 3 tests pass unchanged
+- [x] 5.4 Confirm `./run-all.sh --check` runs the Tier 4 tests and CI passes on Python 3.10 to 3.13; Tier 1 to 3 tests pass unchanged (CI run on 8abf598, 2026-10-18: all jobs pass; Tier 4 tests collected via `testpaths = tests`)
 
 ## 6. Live runs
 

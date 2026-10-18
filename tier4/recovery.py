@@ -4,7 +4,8 @@ nothing here reaches the engine.
 Unlike Tier 3's manifestation check, replaced pods and restart counts do not count:
 a restart or rollback always replaces pods. Recovered means every Deployment is back
 at its baseline availability with its rollout complete, every application pod is
-Running and Ready, and no service deviates from its baseline (Tier 2 rules).
+Running and Ready, and no service deviates from its baseline (Tier 2 rules). Missing
+service telemetry fails the check.
 """
 from __future__ import annotations
 
@@ -23,9 +24,12 @@ NOT_RECOVERED = "not_recovered"
 @dataclass
 class RecoveryConfig:
     check_s: float = 15.0
-    hold_s: float = 30.0
-    window_s: float = 300.0
-    stats_window_s: int = 30  # service stats over the time since the last check
+    hold_s: float = 60.0  # spans at least one fresh span-metrics sample (they come every 60 s)
+    window_s: float = 360.0
+    # increase() needs two samples in the window; at 60 s spacing a 120 s window holds the
+    # last two, so it measures roughly the last minute. Shorter windows return no series
+    # at all (measured on kind, 2026-10-18).
+    stats_window_s: int = 120
 
 
 def problems(cur_stats: dict[str, ServiceStats], base_stats: dict[str, ServiceStats],
@@ -45,6 +49,8 @@ def problems(cur_stats: dict[str, ServiceStats], base_stats: dict[str, ServiceSt
             continue  # an old pod on its way out after a restart or rollback
         if not (p["phase"] == "Running" and p["ready"]):
             out.append(f"pod {p['name']} not ready")
+    if base_stats and not cur_stats:
+        out.append("no service telemetry in the window")  # never pass on missing data
     out += [f"service {s} deviates" for s in any_deviation(cur_stats, base_stats)]
     return out
 
