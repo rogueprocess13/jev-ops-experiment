@@ -158,13 +158,14 @@ class Executor:
                     out["t_action_start"] = None
                     return out
                 raise ExecutorError(f"rollout undo of {component} failed (rc={rc}): {text.strip()[-200:]}")
-            out["revision_after"] = _revision(self.kube.deployment(component))
         out["executed"] = True
         if action == "scale_up":
             out["t_action_done"] = _iso(self._clock())
         else:
             out["rollout_complete"] = self._wait_rollout(component)
             out["t_action_done"] = _iso(self._clock())
+            if action == "rollback_change":  # the controller bumps the revision during the rollout
+                out["revision_after"] = _revision(self.kube.deployment(component))
         return out
 
     def _wait_rollout(self, name: str) -> bool:
