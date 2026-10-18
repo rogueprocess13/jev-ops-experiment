@@ -24,6 +24,20 @@ def build_tier4_deps():
     return Tier4Deps(base=base, executor=lambda: Executor(kube, undo=undo))
 
 
+class ScriptedEngine:
+    """For `probe` only: always reports an incident with a fixed action and component, so
+    an action can be tried on a fault without calling Jev (tasks 1.3-1.6)."""
+
+    def __init__(self, action: str, component: str):
+        self.action, self.component = action, component
+
+    def decide(self, observation):
+        from tier3.engine import Decision
+        return Decision(status="ok", incident_detected=True, affected_component=self.component,
+                        diagnosis="unknown", recommended_action=self.action, confidence=1.0,
+                        telemetry={"model": "probe"})
+
+
 def print_remediation(rec: dict) -> None:
     rem = rec.get("remediation")
     if not rem:
@@ -45,6 +59,11 @@ def main(argv=None) -> int:
     b = sub.add_parser("batch", help="run several experiments (default: the whole catalogue)")
     b.add_argument("experiment_ids", nargs="*")
     b.add_argument("--repeats", type=int, default=1)
+    pr = sub.add_parser("probe", help="try one action on one fault, without Jev (testbed probes)")
+    pr.add_argument("experiment_id")
+    pr.add_argument("action")
+    pr.add_argument("component")
+    pr.add_argument("--results-dir", default=str(DEFAULT_RESULTS / "probe"))
     for p in (r, b):
         p.add_argument("--results-dir", default=str(DEFAULT_RESULTS))
     for name, hlp in (("scorecard", "print the scorecard for a results directory"),
@@ -74,6 +93,15 @@ def main(argv=None) -> int:
         return 0
 
     from tier4.runner import new_run_id, run_batch, run_experiment
+    if args.cmd == "probe":
+        from dataclasses import replace
+        deps = build_tier4_deps()
+        deps.base = replace(deps.base, engine=ScriptedEngine(args.action, args.component))
+        rec = run_experiment(get_scenario(args.experiment_id), deps, make_config("poll"),
+                             new_run_id(), Path(args.results_dir))
+        print_record(rec)
+        print_remediation(rec)
+        return 0 if rec["status"] == "ok" else 1
     try:
         if args.cmd == "run":
             scns = [get_scenario(args.experiment_id)]
