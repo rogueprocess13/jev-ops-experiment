@@ -133,4 +133,4 @@ Other people clone this repo and run it. Keep these working:
 
 ## Status
 
-Everything except the live runs is implemented and tested offline. Still open: the first real-Jev run (needs an API key), then marking `PLAN.md` implemented and tagging v0.1.0. Tier 3 code and offline tests are written, and every fault has been verified on the kind cluster (task group 1, `docs/k8s-testbed-notes.md`); the live Jev runs are not done yet.
+Everything except the live runs is implemented and tested offline. Still open: the first real-Jev run (needs an API key), then marking `PLAN.md` implemented and tagging v0.1.0. Tier 3 is done: every fault verified on the kind cluster (`docs/k8s-testbed-notes.md`) and the first full live Jev batch written up in `docs/results-2026-10-18-tier3-jev.md` (2026-10-18). The cluster is stopped, not deleted; `tier3/testbed/start.sh` brings it back.

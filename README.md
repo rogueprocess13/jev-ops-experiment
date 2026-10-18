@@ -406,6 +406,8 @@ The tests need no network and no API key. They cover scenario definitions, gener
 
 The [LF Edge AIOps group](https://github.com/lfedgeai/AIOps) (`research/agentic_aiops_architectures`) tests agents against Kubernetes API faults on the OpenTelemetry Demo, polls them to measure time-to-detect (MTTD), and reports detect, RCA, remediation and MTTD. Tier 2's flagd faults and single decision could not be compared with that. Tier 3 runs Jev against the group's ten fault types, with their names and their target (`cart`), and reports in their terms.
 
+First full batch (Jev, 30 fault runs and 10 healthy controls): [docs/results-2026-10-18-tier3-jev.md](docs/results-2026-10-18-tier3-jev.md).
+
 ### What is and is not comparable with the group's results
 
 | | LF Edge harness | Tier 3 |
@@ -525,6 +527,8 @@ tier2/ tier3/             Tiers 2 and 3 (see their sections and CLAUDE.md)
 docs/jev-api-notes.md     Jev API notes
 docs/llm-baseline-notes.md API notes for the baseline engines
 docs/results-2026-10-05-tier1-baselines.md  first four-engine comparison, with test machine
+docs/results-2026-10-12-tier2-jev.md        first live Tier 2 runs (Jev)
+docs/results-2026-10-18-tier3-jev.md        first full Tier 3 batch (Jev, 40 runs)
 openspec/                 specs, design and tasks for this project
 ```
 

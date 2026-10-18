@@ -10,7 +10,7 @@
 - [x] 1.8 Check whether `cart` reads `DATABASE_HOST`; if not, drop or retarget `config_corruption` and note it for the group
 - [x] 1.9 Check whether `kill_pod` and `pvc_full` leave a symptom long enough to observe; keep, retune or drop
 - [x] 1.10 Capture real Warning events from these runs as leak-test fixtures and list every string that names a fault or harness object
-- [ ] 1.11 Write `docs/k8s-testbed-notes.md`: versions, ports, queries, fault behaviour, dropped scenarios and reasons, and the differences from the group's fault code (D5); delete or stop the cluster (notes written 2026-10-14; cluster kept running for group 10)
+- [x] 1.11 Write `docs/k8s-testbed-notes.md`: versions, ports, queries, fault behaviour, dropped scenarios and reasons, and the differences from the group's fault code (D5); delete or stop the cluster (notes written 2026-10-14; cluster stopped with `stop.sh` 2026-10-18 after group 10)
 
 ## 2. Testbed scripts
 
@@ -68,13 +68,13 @@
 
 - [x] 9.1 Update `CLAUDE.md`: Kubernetes allowed for the Tier 3 kind testbed only; recommendation-only rule unchanged; Tier 3 rules, layout and commands
 - [x] 9.2 Update `README.md`: Tier 3, relation to the LF Edge harness and what is not comparable, host requirements, commands, scenario table, environment variables
-- [ ] 9.3 Add Tier 3 tests to `./run-all.sh --check`; confirm CI passes offline on Python 3.10 to 3.13 (included automatically via `testpaths = tests`; passes locally on 3.13, CI on 3.10-3.12 not yet seen)
+- [x] 9.3 Add Tier 3 tests to `./run-all.sh --check`; confirm CI passes offline on Python 3.10 to 3.13 (included automatically via `testpaths = tests`; CI run 39106546717 on 2026-10-18: tests pass on 3.10, 3.11, 3.12, 3.13)
 - [x] 9.4 Confirm Tier 1 and Tier 2 tests pass unchanged (375 passed, Python 3.13, 2026-10-14)
 
 ## 10. Live verification
 
 - [x] 10.1 Free memory, run `./setup-k8s.sh`, confirm health (2026-10-18: restarted the existing cluster with the fixed `start.sh`; all health checks ok)
-- [ ] 10.2 Run each scenario once with Jev in `poll` mode; read each request by hand for leaks
-- [ ] 10.3 Batch with `--repeats 3`, plus at least 10 `K000` runs for the false-positive rate
-- [ ] 10.4 Print the scorecard, export for the group, export reasoning and hand-score it if Jev returned any
-- [ ] 10.5 Write `docs/results-<date>-tier3-jev.md` from the run records only, stating what is not comparable with the group's agents; delete or stop the cluster
+- [x] 10.2 Run each scenario once with Jev in `poll` mode; read each request by hand for leaks (K000-K005 2026-10-14 run 20261014-195159-3f10; K006-K009 20261018-055547-2407; K010 20261018-061800-a5b2; no leaks: effects only, taint shown as effect not key)
+- [x] 10.3 Batch with `--repeats 3`, plus at least 10 `K000` runs for the false-positive rate (2026-10-18: 30 fault runs in 20261018-070851-60ee, 10 K000 in 20261018-100756-41e8; all ok, 0 contaminated, 0 invalid of 351 polls)
+- [x] 10.4 Print the scorecard, export for the group, export reasoning and hand-score it if Jev returned any (scorecard, export-lfedge and export-reasoning over both run directories; Jev returned no reasoning text, so nothing to hand-score)
+- [x] 10.5 Write `docs/results-<date>-tier3-jev.md` from the run records only, stating what is not comparable with the group's agents; delete or stop the cluster (`docs/results-2026-10-18-tier3-jev.md`; cluster stopped, not deleted)
