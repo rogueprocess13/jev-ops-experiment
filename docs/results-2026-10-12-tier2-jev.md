@@ -63,7 +63,7 @@ Jev answers four questions with fixed answer sets:
 
 | Question | Answer set |
 |---|---|
-| Is there an incident now? | probability from 0 to 1. Above 0.5 counts as yes. |
+| Is there an incident now? | probability from 0 to 1. 0.5 or more counts as yes. |
 | Which service is the origin? | `none` or one of 18 services |
 | What is the failure mode? | 7 diagnoses, for example `application_failure` or `dependency_unreachable` |
 | What is the next action? | 6 actions, for example `investigate`, `escalate` or `no_action` |

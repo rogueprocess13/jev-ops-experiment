@@ -55,7 +55,7 @@ Each observation is a JSON document of 6,207 to 12,699 bytes (3,834 to 6,471 inp
 
 The observation shows effects only. It contains no pod specs, environment variables, resource limits, NetworkPolicy objects or taint keys. A node taint shows up as its effect (`NoExecute`), never its key. The leak test in `tests/tier3/test_runner.py` runs every scenario and every poll through the whole path. In task 10.2 we also read the requests of one run of each scenario by hand and searched every stored request for the ten fault names, `jev-fault`, `harness`, `scenario`, `ground_truth` and `inject`. We found none.
 
-Jev answers four questions with fixed answer sets: incident (probability, above 0.5 is yes), component (`none`, 15 services or 4 nodes), diagnosis (12 values) and action (6 values). Jev returned no reasoning text in any of the 351 polls, so the reasoning sheet (`python -m tier3 export-reasoning`) has nothing to hand-score.
+Jev answers four questions with fixed answer sets: incident (probability, 0.5 or more is yes), component (`none`, 15 services or 4 nodes), diagnosis (12 values) and action (6 values). Jev returned no reasoning text in any of the 351 polls, so the reasoning sheet (`python -m tier3 export-reasoning`) has nothing to hand-score.
 
 ## How we score
 
