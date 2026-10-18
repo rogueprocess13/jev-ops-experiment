@@ -34,7 +34,7 @@
 - [x] 5.4 Implement env-based config loading with a clear error naming any missing variable
 - [x] 5.5 Implement bounded retries for transient failures, returning an `error` result on exhaustion
 - [x] 5.6 Ensure credentials never appear in returned or stored data
-- [ ] 5.7 Minimal `run.py`: one scenario, generate, call Jev, print decision and compare (smoke-test against real Jev once)
+- [x] 5.7 Minimal `run.py`: one scenario, generate, call Jev, print decision and compare (smoke-test against real Jev once) (real-Jev batches 2026-10-05 and 2026-10-18)
 
 ## 6. Evaluation
 
@@ -106,5 +106,5 @@
 ## 14. First experiment and wrap-up
 
 - [x] 14.1 Run `python run.py --runs 70` and `--runs 70 --no-logs` with the same seed against real Jev and keep the JSONL and summary locally (2026-10-18, seed 1000: `results/20261018-134025-70runs.jsonl`, `results/20261018-134058-70runs-nologs.jsonl`)
-- [ ] 14.2 Review ambiguous/contradictory results and note observations in the README or a `docs/` findings note (calculated from real output only)
+- [x] 14.2 Review ambiguous/contradictory results and note observations in the README or a `docs/` findings note (calculated from real output only) (`docs/results-2026-10-18-tier1-jev.md`)
 - [ ] 14.3 Update `PLAN.md` status to implemented and tag v0.1.0
