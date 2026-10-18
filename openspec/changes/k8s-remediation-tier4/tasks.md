@@ -48,9 +48,9 @@
 
 ## 7. Opus baseline engine, same interface (after group 6)
 
-- [ ] 7.1 Move Tier 3's question set and answer vocabularies out of `tier3/jev_adapter.py` into a module with no Jev import (`tier3/questions.py`); the Jev adapter imports it; Tier 3 tests and the "only the adapter imports `jev.client`" test still pass
-- [ ] 7.2 `tier3/claude_engine.py` (an `AIOpsEngine`): the same observation and the same four questions to `claude-opus-5-5` through the Anthropic API, structured output restricted to the same answer sets, strict parsing (out-of-set is `invalid`), tokens and cost from `CLAUDE_OPUS_PRICE_*` only, `n/a` otherwise; reuse `llm/claude.py` settings (temperature, effort) where they fit
-- [ ] 7.3 Tests: the prompt carries no scenario, fault name, expected answer or harness term (the Tier 3/4 whole-path leak tests run with this engine's request builder); parsing of valid, out-of-set and missing answers; no API call in tests
-- [ ] 7.4 `--engine jev|claude-opus` on `python -m tier3` and `python -m tier4` (`run`, `batch`), recorded in every run record and in the LF Edge export's `approach`
+- [x] 7.1 Move Tier 3's question set and answer vocabularies out of `tier3/jev_adapter.py` into a module with no Jev import (`tier3/questions.py`); the Jev adapter imports it; Tier 3 tests and the "only the adapter imports `jev.client`" test still pass
+- [x] 7.2 `tier3/claude_engine.py` (an `AIOpsEngine`): the same observation and the same four questions to `claude-opus-5-5` through the Anthropic API, structured output restricted to the same answer sets, strict parsing (out-of-set is `invalid`), tokens and cost from `CLAUDE_OPUS_PRICE_*` only, `n/a` otherwise; reuse `llm/claude.py` settings (temperature, effort) where they fit
+- [x] 7.3 Tests: the prompt carries no scenario, fault name, expected answer or harness term (the Tier 3/4 whole-path leak tests run with this engine's request builder); parsing of valid, out-of-set and missing answers; no API call in tests
+- [x] 7.4 `--engine jev|claude-opus` on `python -m tier3` and `python -m tier4` (`run`, `batch`), recorded in every run record and in the LF Edge export's `approach`
 - [ ] 7.5 Live: Tier 4 batch with `--engine claude-opus` on the same scenarios and repeats as 6.2 (`K001`-`K010` x3, `K000` x10)
 - [ ] 7.6 Write the comparison from the run records only: Jev vs Opus on detect, RCA, action, single-shot MTTR and verified MTTR, recovered by action, false-alarm actions, cost; label every MTTR "single-shot recommendation MTTR"

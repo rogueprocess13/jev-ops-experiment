@@ -71,6 +71,12 @@ class Deps:
     sleep: Callable[[float], None] = time.sleep
 
 
+def engine_info(engine) -> dict:
+    """Which engine answered. An engine without .info is recorded by its class name."""
+    info = getattr(engine, "info", None)
+    return dict(info) if isinstance(info, dict) else {"name": type(engine).__name__}
+
+
 def _decision_dict(d: Decision) -> dict:
     return {"status": d.status, "incident_detected": d.incident_detected,
             "affected_component": d.affected_component, "diagnosis": d.diagnosis,
@@ -109,6 +115,7 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
                          "diagnosis": scn.expected.diagnosis,
                          "acceptable_actions": list(scn.expected.acceptable_actions)},
         "status": STATUS_OK, "message": "", "versions": cfg.versions, "git_commit": cfg.git_commit,
+        "engine": engine_info(deps.engine),
         "polls": [],
     }
     injected, timer = False, None

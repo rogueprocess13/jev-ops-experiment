@@ -13,6 +13,7 @@ from tier3.scenarios import ScenarioError, format_list, get_scenario, load_all
 from tier3.vocab import FAULT_TYPES
 
 DEFAULT_RESULTS = Path("results") / "tier3"
+ENGINES = ("jev", "claude-opus")
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -30,16 +31,27 @@ def _clients():
                 workload=Workload(testbed.base_url()))
 
 
-def build_deps():
-    from tier3.collect import collect, kube_state
-    from tier3.deadman import Deadman
-    from tier3.jev_adapter import ConfigError, JevAdapter
-    from tier3.runner import Deps
-
+def build_engine(name: str = "jev"):
+    """The engine behind every poll. Raises SystemExit on a configuration error, before any run."""
+    if name == "jev":
+        from tier3.jev_adapter import ConfigError, JevAdapter
+        try:
+            return JevAdapter()
+        except ConfigError as e:
+            raise SystemExit(f"error: {e}")
+    from tier3.claude_engine import ConfigError, build_claude_engine
     try:
-        engine = JevAdapter()
+        return build_claude_engine(name)
     except ConfigError as e:
         raise SystemExit(f"error: {e}")
+
+
+def build_deps(engine: str = "jev"):
+    from tier3.collect import collect, kube_state
+    from tier3.deadman import Deadman
+    from tier3.runner import Deps
+
+    engine = build_engine(engine)
     c = _clients()
 
     def health():
@@ -104,6 +116,7 @@ def main(argv=None) -> int:
     b.add_argument("--repeats", type=int, default=1)
     for p in (r, b):
         p.add_argument("--mode", choices=("poll", "single"), default="poll")
+        p.add_argument("--engine", choices=ENGINES, default="jev")
         p.add_argument("--results-dir", default=str(DEFAULT_RESULTS))
     for name, hlp in (("scorecard", "print the scorecard for a results directory"),
                       ("export-lfedge", "write JSONL in the LF Edge harness's field names"),
@@ -151,7 +164,7 @@ def main(argv=None) -> int:
     except ScenarioError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    deps, cfg = build_deps(), make_config(args.mode)
+    deps, cfg = build_deps(args.engine), make_config(args.mode)
     if args.cmd == "run":
         rec = run_experiment(scns[0], deps, cfg, new_run_id(), Path(args.results_dir))
         print_record(rec)

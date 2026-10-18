@@ -65,3 +65,13 @@ One run each, `--scenario degraded --seed 1234`, both HTTP 200 / exit 0 and pars
 Isolation: the CLI's 2,322 input tokens are close to the size of our own prompt and schema (Ollama's tokenizer counts 2,197 for the same request), and only one model appears in `modelUsage`. Claude Code's default system prompt, tool definitions and this repo's `CLAUDE.md` would add many thousands of tokens, so none of them reached the model. `--setting-sources ""` is accepted by this CLI version. `num_turns` is 2: the CLI delivers structured output through an extra internal turn.
 
 Cost: the CLI reported $0.010564. That matches Anthropic's list price for a **1-hour cache write** of the whole prompt (2,320 × $4/MTok, twice the base input price) plus 128 × $10/MTok output. The CLI caches the prompt and the API engine does not, so CLI-reported cost runs about 1.8× what the same call would cost through the API. Compare cost only between runs with the same transport.
+
+## Tier 3 and Tier 4 Claude baseline (`tier3/claude_engine.py`)
+
+Added 2026-10-18. The same transports and settings as above (model IDs, `LLM_EFFORT`, `max_tokens`, retries, the CLI isolation flags and environment), with Tier 3's question set instead of Tier 1's:
+
+- The questions and option descriptions are `tier3/questions.py`, the same objects the Jev adapter sends. `incident_detected` is Jev's yes/no (`noul`) question; for Claude its options are the strings `true` / `false` (Jev answers a probability, scored at 0.5 or more).
+- The observation is wrapped as `{"observations": ...}`, the key the Jev adapter uses.
+- The JSON schema allows exactly the four answer sets. The parser is strict: a missing or out-of-set value is `invalid`. Claude reports no confidence, so `confidence` is null.
+- Cost: `total_cost_usd` from the CLI (`reported:claude-cli`), else an estimate from `CLAUDE_OPUS_PRICE_*`, else null.
+- Smoke check, 2026-10-18, CLI transport (no `ANTHROPIC_API_KEY`), one stored K000 observation: exit 0, valid answer, 6,732 input / 394 output tokens, about 7 s.

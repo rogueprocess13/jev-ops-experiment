@@ -18,7 +18,7 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 - **All randomness comes from `random.Random(seed)`** inside the generator. Never use the global RNG. Logs are generated *after* metrics and services, so adding log kinds never changes a seed's metrics. Keep it that way.
 - **Log lines must not leak the answer.** No scenario names, and no wording that tells Jev what to do (`test_logs_do_not_leak_scenario_or_answer`).
 - **Secrets stay in `.env`** (git-ignored). Never log, store or commit `JEV_API_KEY`. `Decision` objects and result files must not contain it.
-- **All Jev HTTP and API code lives in `jev/client.py`** (transport, retries, usage telemetry; Tier 1 questions and parsing too). Tier 2's question set and answer parsing live in `tier2/jev_adapter.py`, which calls `JevClient.send`. Baseline LLM engines (Claude API, `claude -p` fallback, Ollama) live in `llm/` and are the only other code that calls a model; they reuse `QUESTIONS` and `Decision` from `jev/client.py`, so every engine gets the same questions. Nothing else may import HTTP or API details. API facts are in `docs/jev-api-notes.md`. Check the current docs at https://docs.typesafe.ai/api before changing request or response handling. Do not guess parameters.
+- **All Jev HTTP and API code lives in `jev/client.py`** (transport, retries, usage telemetry; Tier 1 questions and parsing too). Tier 2's question set and answer parsing live in `tier2/jev_adapter.py`, which calls `JevClient.send`. Baseline LLM engines (Claude API, `claude -p` fallback, Ollama) live in `llm/` and are the only other code that calls a model; they reuse `QUESTIONS` and `Decision` from `jev/client.py`, so every engine gets the same questions. The one exception is `tier3/claude_engine.py`, the Tier 3/4 Claude baseline: it asks Tier 3's questions (`tier3/questions.py`, shared with the Jev adapter) and reuses `llm/claude.py`'s settings, with no direct `jev` import. Nothing else may import HTTP or API details. API facts are in `docs/jev-api-notes.md`. Check the current docs at https://docs.typesafe.ai/api before changing request or response handling. Do not guess parameters.
 
 ## Tier 2 rules (OpenTelemetry Demo)
 
@@ -41,7 +41,7 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 - **Save before you change, restore exactly.** Every inject writes the saved state to `results/tier3/.active-fault.json` first, reads the change back, and reset restores the saved state (not fixed values) and reads it back. `node_taint` only targets an application worker and only removes its own taint. The dead-man timer (`tier3/deadman.py`) and `python -m tier3 reset-faults` must keep working from the ledger alone.
 - **Ground truth never reaches the engine.** `tier3/observation.py`, `tier3/collect.py` and `tier3/collectors/kube.py` must not import `tier3.scenarios` or `tier3.faults`. The observation shows effects only: no pod specs, environment variables, resource limits, NetworkPolicy objects or taint keys. The whole-path leak test in `tests/tier3/test_runner.py` covers every scenario and every poll.
 - **Polling is scored once.** In `poll` mode the first poll that reports an incident is scored (else the last poll); every poll is stored. On the healthy control every detecting poll is a false-positive poll.
-- **Only the adapter touches Jev.** `tier3/jev_adapter.py` is the only Tier 3 module that imports `jev.client` (`test_only_the_adapter_imports_jev_client`).
+- **Only the adapter touches Jev.** `tier3/jev_adapter.py` is the only Tier 3 module that imports `jev.client` (`test_only_the_adapter_imports_jev_client`). The question set lives in `tier3/questions.py` so the Claude baseline (`tier3/claude_engine.py`, `--engine claude-opus` on `python -m tier3` and `python -m tier4`) asks exactly the same questions; every run record says which engine answered (`engine`).
 - **No Kubernetes Python client.** The API is reached with `requests` (`tier3/collectors/kube.py`); pod exec uses `kubectl`. Versions are pinned in `tier3/testbed/pins.env`; facts verified on the cluster go in `docs/k8s-testbed-notes.md`.
 - Tier 3 tests are offline: `FakeKube`, fake collectors, fake engine, virtual clock. Never start kind or Docker, or call Jev, from a test.
 
@@ -89,6 +89,7 @@ tier3/                     Tier 3 (LF Edge Kubernetes faults on kind)
   collectors/kube.py collect.py   thin Kubernetes API client; Tier 2 collectors + cluster state
   observation.py manifest.py      observation builder and scrubber; manifestation and recovery checks
   engine.py jev_adapter.py AIOpsEngine + Decision; the Jev adapter
+  questions.py claude_engine.py   shared question set; Claude Opus baseline engine (API or claude -p)
   runner.py evaluate.py report.py cli.py   lifecycle and polling; verdicts; scorecard and exports
   testbed/                 pins.env, kind.yaml, values/, create/install/health/stop/start/delete/rebalance scripts, probe_fault.py
 tests/tier3/               offline Tier 3 tests
@@ -128,6 +129,7 @@ run-remediation-experiment run-all-remediation-experiments   Tier 4 entry points
 | Tier 3 scorecard | `python -m tier3 scorecard results/tier3/<run-id>` (also `export-lfedge`, `export-reasoning`) |
 | Tier 4 one run | `./run-remediation-experiment K001` |
 | Tier 4 batch | `./run-all-remediation-experiments [--repeats N]` |
+| Tier 3/4 Opus baseline | add `--engine claude-opus` to `run`/`batch` (API with `ANTHROPIC_API_KEY`, else `claude -p`) |
 | Tier 4 scorecard | `python -m tier4 scorecard results/tier4/<run-id>` (also `export-lfedge`) |
 
 `run.py` and `run-all.sh` need `JEV_API_KEY` in `.env` for the default `jev` engine. Each run makes one real model call, so use small `--runs` while developing.

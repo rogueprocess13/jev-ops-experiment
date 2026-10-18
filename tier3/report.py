@@ -122,6 +122,7 @@ def format_scorecard(records: list[dict]) -> str:
         f"{_frac(o['detection_precision'])}",
         f"Invalid replies: {_frac(o['invalid_replies'])} polls. Runs with errors: {o['runs_error']}, "
         f"contaminated: {o['runs_contaminated']}.",
+        engines_line(records),
         f"Engine calls: {o['engine_calls']}. Tokens in/out: {_num(o['input_tokens'])}/"
         f"{_num(o['output_tokens'])}. Cost: {_num(o['cost_usd'], ' USD')}.",
         f"Remediation executed: {NOT_MEASURED}.",
@@ -136,6 +137,17 @@ def format_scorecard(records: list[dict]) -> str:
 
 def _bool(verdict: str):
     return None if verdict == UNKNOWN else verdict == PASS
+
+
+def engine_name(r: dict) -> str:
+    """Records from before engines were recorded are all Jev's."""
+    return (r.get("engine") or {}).get("name") or "jev"
+
+
+def engines_line(records: list[dict]) -> str:
+    seen = sorted({(engine_name(r), (r.get("engine") or {}).get("transport") or "jev-api")
+                   for r in records})
+    return "Engine: " + ", ".join(f"{n} ({t})" for n, t in seen) + "."
 
 
 def export_lfedge(records: list[dict]) -> list[dict]:
@@ -164,7 +176,7 @@ def export_lfedge(records: list[dict]) -> list[dict]:
             "mttr_seconds": None,
             "mttr_verified_seconds": None,
             "recovery_verified": None,
-            "approach": f"jev:{model}" if model else "jev",
+            "approach": f"{engine_name(r)}:{model}" if model else engine_name(r),
             "llm_invoked": r["usage"]["answered_calls"] > 0,
             "agent_error": r["message"] or None if r["status"] == "error" else None,
             # ours, alongside theirs
