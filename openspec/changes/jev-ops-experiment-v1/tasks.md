@@ -107,4 +107,4 @@
 
 - [x] 14.1 Run `python run.py --runs 70` and `--runs 70 --no-logs` with the same seed against real Jev and keep the JSONL and summary locally (2026-10-18, seed 1000: `results/20261018-134025-70runs.jsonl`, `results/20261018-134058-70runs-nologs.jsonl`)
 - [x] 14.2 Review ambiguous/contradictory results and note observations in the README or a `docs/` findings note (calculated from real output only) (`docs/results-2026-10-18-tier1-jev.md`)
-- [ ] 14.3 Update `PLAN.md` status to implemented and tag v0.1.0
+- [x] 14.3 Update `PLAN.md` status to implemented and tag v0.1.0 (2026-10-19)

@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Status: **planned, not started.** This file is the implementation prompt that kicks off the project. Nothing below has been built yet.
+Status: **implemented** (v0.1.0, 2026-10-19). This file is the original implementation prompt that kicked off the project, kept as written. Everything below was built as Tier 1 and run against real Jev ([docs/results-2026-10-18-tier1-jev.md](docs/results-2026-10-18-tier1-jev.md)). Tiers 2 to 4 went beyond this plan and are specified in `openspec/changes/`.
 
 Use this as the implementation prompt. It keeps the first version deliberately small and leaves room to evolve it later.
 

@@ -2,23 +2,34 @@
 
 This project tests whether Jev AI can make bounded operational decisions from synthetic server-state information. Server conditions are generated from predefined scenarios with independently defined expected outcomes. Jev receives the observations and selects from a bounded set of operational decisions. The experiment then compares Jev's decisions against the expected outcomes and records accuracy and confidence.
 
-> **This is an experimental benchmark, not a production autonomous remediation system.** It only generates data, asks Jev for a decision, and records the answer. It never restarts, changes or escalates anything.
+> **This is an experimental benchmark, not a production autonomous remediation system.** Tiers 1 to 3 only generate or collect data, ask Jev for a decision and record the answer; they never restart, change or escalate anything. Only Tier 4 carries out a recommendation, once per run, from a fixed three-operation allowlist, and only on the local kind testbed.
 
 Prepared for discussion in the LF Edge AIOps forum.
 
 [![tests](https://github.com/rogueprocess13/jev-ops-experiment/actions/workflows/tests.yml/badge.svg)](https://github.com/rogueprocess13/jev-ops-experiment/actions/workflows/tests.yml)
 
-## Three tiers
+## Four tiers
 
-| | Tier 1: synthetic | Tier 2: OpenTelemetry Demo | Tier 3: Kubernetes faults |
-|---|---|---|---|
-| Input | Seeded random server statistics | Real metrics, logs and traces from a running distributed application | Tier 2's telemetry plus Kubernetes state (deployments, pods, nodes, events) |
-| Tests | Basic decision reasoning | AIOps reasoning against realistic telemetry | The LF Edge AIOps group's fault catalogue, with time-to-detect and false alarms |
-| Ground truth | Hand-written expected decision per scenario | The fault the harness injected, hidden from Jev | The same, for Kubernetes API faults |
-| Infrastructure | None (Python only) | Docker Compose | A local four-node kind cluster |
-| Run with | `./run-all.sh` (this page, below) | `./run-experiment F001` ([Tier 2](#tier-2-opentelemetry-demo)) | `./run-k8s-experiment K001` ([Tier 3](#tier-3-kubernetes-faults-on-kind)) |
+| | Tier 1: synthetic | Tier 2: OpenTelemetry Demo | Tier 3: Kubernetes faults | Tier 4: closed-loop remediation |
+|---|---|---|---|---|
+| Input | Seeded random server statistics | Real metrics, logs and traces from a running distributed application | Tier 2's telemetry plus Kubernetes state (deployments, pods, nodes, events) | Tier 3's observation |
+| Tests | Basic decision reasoning | AIOps reasoning against realistic telemetry | The LF Edge AIOps group's fault catalogue, with time-to-detect and false alarms | Whether carrying out the recommended action once fixes the fault, and how fast (MTTR) |
+| Ground truth | Hand-written expected decision per scenario | The fault the harness injected, hidden from Jev | The same, for Kubernetes API faults | The same faults, plus service-level recovery checks |
+| Infrastructure | None (Python only) | Docker Compose | A local four-node kind cluster | Tier 3's cluster |
+| Run with | `./run-all.sh` (this page, below) | `./run-experiment F001` ([Tier 2](#tier-2-opentelemetry-demo)) | `./run-k8s-experiment K001` ([Tier 3](#tier-3-kubernetes-faults-on-kind)) | `./run-remediation-experiment K001` ([Tier 4](#tier-4-closed-loop-remediation-on-kind)) |
 
-The tiers share only the Jev client (`jev/client.py`); Tier 3 also reuses Tier 2's collectors and scrubber. [Tier 4](#tier-4-closed-loop-remediation-on-kind) reruns Tier 3's faults on the same cluster and carries out Jev's recommended action to measure MTTR. Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tiers 2, 3 and 4 have their own sections.
+The tiers share only the Jev client (`jev/client.py`); Tier 3 also reuses Tier 2's collectors and scrubber, and Tier 4 reuses Tier 3's runner and cluster. Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tiers 2, 3 and 4 have their own sections.
+
+## Results so far
+
+Every tier has been run live against real Jev (v0.1.0, 2026-10-19). Figures come from the run records only.
+
+| Tier | Write-up |
+|---|---|
+| 1 | [Jev, Claude Sonnet, Claude Opus and qwen3:8b, 70 runs each](docs/results-2026-10-05-tier1-baselines.md); [Jev rerun with and without logs](docs/results-2026-10-18-tier1-jev.md) |
+| 2 | [First live Jev runs](docs/results-2026-10-12-tier2-jev.md) |
+| 3 | [Jev, 30 fault runs and 10 healthy controls](docs/results-2026-10-18-tier3-jev.md) |
+| 4 | [Jev, 40 runs](docs/results-2026-10-19-tier4-jev.md); [Jev vs Claude Opus](docs/results-2026-10-19-tier4-jev-vs-opus.md) (fixed by the single action: Jev 4/18 incident runs, Opus 13/18) |
 
 ## Quick start
 
@@ -224,7 +235,7 @@ The seed fixes the **input**: the same scenario and seed always produce the same
 
 ## Results
 
-First full comparison (Jev, Claude Sonnet, Claude Opus, qwen3:8b; 70 runs each): [docs/results-2026-10-05-tier1-baselines.md](docs/results-2026-10-05-tier1-baselines.md).
+First full comparison (Jev, Claude Sonnet, Claude Opus, qwen3:8b; 70 runs each): [docs/results-2026-10-05-tier1-baselines.md](docs/results-2026-10-05-tier1-baselines.md). Jev rerun with and without logs, and the ambiguous and contradictory scenarios: [docs/results-2026-10-18-tier1-jev.md](docs/results-2026-10-18-tier1-jev.md).
 
 Each run writes to `results/` (git-ignored):
 
@@ -482,7 +493,7 @@ Notes on the testbed, the verified facts and every dropped scenario are in `docs
 
 ## Tier 4: closed-loop remediation on kind
 
-> Status: the first full live Jev batch (40 runs) is written up in [docs/results-2026-10-19-tier4-jev.md](docs/results-2026-10-19-tier4-jev.md), and the Claude Opus baseline on the same path (40 runs, through the `claude` CLI) in [docs/results-2026-10-19-tier4-jev-vs-opus.md](docs/results-2026-10-19-tier4-jev-vs-opus.md). Recovered by the single action: Jev 4/18 incident runs, Opus 13/18.
+> Status: done. The first full live Jev batch (40 runs) is written up in [docs/results-2026-10-19-tier4-jev.md](docs/results-2026-10-19-tier4-jev.md), and the Claude Opus baseline on the same path (40 runs, through the `claude` CLI) in [docs/results-2026-10-19-tier4-jev-vs-opus.md](docs/results-2026-10-19-tier4-jev-vs-opus.md). Recovered by the single action: Jev 4/18 incident runs, Opus 13/18.
 
 Tier 3 reports remediation executed, MTTR and recovery verified as "not measured", because it never acts. Tier 4 runs the same scenarios (`K000` to `K010`) on the same cluster, and after the first poll that reports an incident it carries out Jev's recommended action on Jev's named component, once. Then it watches whether the system recovers. This is the only tier that acts on an engine's recommendation.
 
@@ -560,7 +571,11 @@ docs/jev-api-notes.md     Jev API notes
 docs/llm-baseline-notes.md API notes for the baseline engines
 docs/results-2026-10-05-tier1-baselines.md  first four-engine comparison, with test machine
 docs/results-2026-10-12-tier2-jev.md        first live Tier 2 runs (Jev)
+docs/results-2026-10-18-tier1-jev.md        Tier 1 Jev rerun, with and without logs
 docs/results-2026-10-18-tier3-jev.md        first full Tier 3 batch (Jev, 40 runs)
+docs/results-2026-10-19-tier4-jev.md        first full Tier 4 batch (Jev, 40 runs)
+docs/results-2026-10-19-tier4-jev-vs-opus.md  Tier 4 Jev vs Claude Opus
+docs/k8s-testbed-notes.md otel-demo-notes.md  testbed facts verified on the cluster and the demo
 openspec/                 specs, design and tasks for this project
 ```
 
