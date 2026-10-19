@@ -4,7 +4,7 @@ This page summarizes the first live Tier 2 runs. Tier 2 injects a known fault in
 
 ## What ran
 
-There are six scenarios. Each scenario ran four times, which gives 24 runs. All 24 runs finished with status `ok`. No run was `contaminated` (the system did not come back to normal after the fault was removed), and no Jev call failed.
+There are six scenarios. Each scenario ran four times, for 24 runs in total. All 24 runs finished with status `ok`. No run was `contaminated` (the system did not come back to normal after the fault was removed), and no Jev call failed.
 
 | | |
 |---|---|
@@ -85,6 +85,8 @@ The table shows passes out of 4 runs for each scenario.
 | F005 slow images | 4/4 | 4/4 | 4/4 | 4/4 |
 | F006 database lock | 4/4 | 0/4 | 1/4 | 4/4 |
 | All 20 fault runs | 20/20 | 15/20 | 13/20 | 19/20 |
+
+Every cell counts PASS verdicts. For the healthy control F000, a detection PASS means "no incident reported", so 0/4 means Jev reported an incident in all four healthy runs.
 
 The wrong answers were these:
 

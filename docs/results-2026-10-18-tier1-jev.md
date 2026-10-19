@@ -1,12 +1,12 @@
 # Results: Tier 1 Jev rerun, with and without logs (2026-10-18)
 
-Tier 1 only (synthetic data). Two 70-run batches against real Jev with the same seed as the 2026-10-05 comparison (1000), one with application logs and one with `--no-logs`. Every figure below comes from these run records:
+This page covers Tier 1 only (synthetic data). We ran two 70-run batches against real Jev with the same seed as the 2026-10-05 comparison (1000). One batch had application logs and one used `--no-logs`. Every figure below comes from these run records:
 
 - `results/20261018-134025-70runs.jsonl` (with logs)
 - `results/20261018-134058-70runs-nologs.jsonl` (no logs)
 - `results/20261005-224157-70runs.jsonl` (the 2026-10-05 Jev batch, with logs, for comparison)
 
-`python report.py --compare` on the three files gives the tables. Model that answered: `jev-1.13.0` in all three.
+Running `python report.py --compare` on the three files gives the tables. The model that answered was `jev-1.13.0` in all three.
 
 ## Same data, same answers
 
@@ -28,9 +28,9 @@ The whole drop is in `log_only_errors`: 10/10 with logs, 0/10 without. That scen
 
 Both scenarios expect `degraded` / `investigate` / human review `yes` / probable cause `unknown`.
 
-**Ambiguous.** With logs Jev gets the decision right on 8/10 runs. The two misses both say `high` instead of `degraded`; action and human review are right on all 10. It never answers `unknown` for the cause: it names a specific one every time (configuration 3, application bug 2, dependency failure 3, resource exhaustion 2). Without logs it says `degraded` on all 10 and `unknown` on 2.
+Ambiguous scenario: with logs Jev gets the decision right on 8/10 runs. The two misses both say `high` instead of `degraded`. Action and human review are right on all 10. It never answers `unknown` for the cause. It names a specific one every time (configuration 3, application bug 2, dependency failure 3, resource exhaustion 2). Without logs it says `degraded` on all 10 and `unknown` on 2.
 
-**Contradictory.** 0/10 with logs, 1/10 without. Jev does not answer "investigate" when the signals disagree:
+Contradictory scenario: 0/10 with logs, 1/10 without. Jev does not answer "investigate" when the signals disagree:
 
 | Answer (severity, action, human review) | with logs | no logs |
 |---|---|---|
@@ -40,8 +40,8 @@ Both scenarios expect `degraded` / `investigate` / human review `yes` / probable
 | high, investigate, yes | 1 | 0 |
 | degraded, investigate, yes (expected) | 0 | 1 |
 
-It splits between waiting (`observe`, 6/10 with logs) and acting (`restart`, 3/10). It names `resource_exhaustion` as the cause on 8 of the 10 runs with logs. The expected answer was written by hand: when signals conflict, a person should investigate before anyone changes anything. Jev takes one side of the conflict instead.
+It splits between waiting (`observe`, 6/10 with logs) and acting (`restart`, 3/10). It names `resource_exhaustion` as the cause on 8 of the 10 runs with logs. The expected answer was written by hand. The reasoning behind it: when signals conflict, a person investigates before anyone changes anything. Jev takes one side of the conflict instead.
 
 ## Cost
 
-Estimated from the user-set `JEV_PRICE_*` prices (not a published price): $0.0043 for the 70 runs with logs and $0.0025 without. Mean tokens per run: 1,466 in / 187 out with logs, 848 / 186 without.
+The estimate uses the user-set prices `JEV_PRICE_INPUT_PER_MTOK=0.042` and `JEV_PRICE_OUTPUT_PER_MTOK=0` (USD per million tokens, not a published price). The cost is $0.0043 for the 70 runs with logs and $0.0025 without. Mean tokens per run: 1,466 in / 187 out with logs, 848 / 186 without.

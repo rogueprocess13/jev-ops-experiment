@@ -10,7 +10,7 @@ Every figure comes from the 80 run records listed below, through `python -m tier
 
 | | Jev | Claude Opus |
 |---|---|---|
-| Engine | `jev` (`jev-api`), model `jev-1.13.0` on every poll | `claude-opus` through the `claude` CLI (`claude -p`, transport `claude-cli`, CLI 2.1.303, effort `medium`), model `claude-opus-5-5` on every poll |
+| Engine | `jev` (`jev-api`), model `jev-1.13.0` on every poll | `claude-opus` through the `claude` CLI (`claude -p`, transport `claude-cli`, CLI 2.1.303 (Tier 1 used 2.1.289), effort `medium`), model `claude-opus-5-5` on every poll |
 | Fault runs | `results/tier4/20261018-232405-5ada/` (2026-10-19 01:24 to 07:00) | `results/tier4/20261019-070552-2d0e/` (09:05 to 14:29) |
 | Control runs | `results/tier4/20261019-050044-6cc4/` (07:00 to 09:05) | `results/tier4/20261019-122929-7076/` (14:29 to 16:35) |
 | Code | `f9960e6` / `8e14998` | `8e14998` (fault runs) / `6fef6c4` (control runs). Neither commit changes code; they only change docs and `tasks.md` |
@@ -84,10 +84,10 @@ Verified MTTR by scenario, Opus (single-shot): K001 174.8 s (127.7-260.8), K003 
 
 ## What this means
 
-- **The gap is in the component and the action, not in detection.** Both engines detected every fault. Opus named the failing component every time, where Jev often named the caller that logged the errors. On the three `scale_up` scenarios (K001, K007, K008), that is the whole difference: 9/9 recovered by action for Opus against 4/9 for Jev.
-- **Opus used `rollback_change`; Jev never did.** On K003 and K005, where a template change caused the fault, both engines had the right component and diagnosis every time. Jev answered `investigate` on all six runs. Opus answered `rollback_change` on four of the six and fixed each of those. Both engines answered `investigate` on every K009 run, and neither ever chose `restart_service` or `escalate`.
-- **Jev is faster to answer.** Jev took about 0.4 s per call, Opus through the CLI about 5 s. That shows up as 16 s against 23 s to the first action. With a 15-second poll interval it does not change which poll is scored.
-- **Opus raised more false alarms, and none led to an action.** All 7 Opus false-positive runs answered `investigate`, so nothing was done. Jev's one false-alarm `scale_up` (K010) was carried out.
+- The gap is in the component and the action, not in detection. Both engines detected every fault. Opus named the failing component every time, where Jev often named the caller that logged the errors. On the three `scale_up` scenarios (K001, K007, K008), that is the whole difference: 9/9 recovered by action for Opus against 4/9 for Jev.
+- Opus used `rollback_change`, and Jev never did. On K003 and K005, where a template change caused the fault, both engines had the right component and diagnosis every time. Jev answered `investigate` on all six runs. Opus answered `rollback_change` on four of the six and fixed each of those. Both engines answered `investigate` on every K009 run, and neither ever chose `restart_service` or `escalate`.
+- Jev is faster to answer. Jev took about 0.4 s per call, Opus through the CLI about 5 s. That shows up as 16 s against 23 s to the first action. With a 15-second poll interval it does not change which poll is scored. A poll starts 15 s after the previous one started. If an answer takes longer than that, the next poll starts at once. This happened on 2 of the 250 Opus polls, both on control runs (15.4 s each).
+- Opus raised more false alarms, and none led to an action. All 7 Opus false-positive runs answered `investigate`, so nothing was done. The harness carried out Jev's one false-alarm `scale_up` (K010).
 
 Three runs per fault are too few to give rates. Read the results as a direction: on this testbed, with these questions and a single action, Opus fixed 13 of 18 incidents and Jev fixed 4.
 
@@ -95,8 +95,8 @@ Three runs per fault are too few to give rates. Read the results as a direction:
 
 The two costs come from different sources and must not be compared as like for like.
 
-- **Jev** reports no cost. With the user-set `JEV_PRICE_*` prices, the 280 calls (1,176,975 input and 108,231 output tokens) cost an estimated USD 0.049.
-- **Opus**: the `claude` CLI reported USD 12.83 for the 250 calls (`reported:claude-cli`; 1,637,118 input and 67,248 output tokens). This is the CLI's own figure. On a subscription plan it is notional, not a bill. The CLI caches the prompt, so its reported cost runs about 1.8 times what the same call would cost through the API, and its token counts include the Claude Code harness's own context ([llm-baseline-notes.md](llm-baseline-notes.md)). No API run was made, and no price is built into the code.
+- Jev reports no cost. With the user-set prices (`JEV_PRICE_INPUT_PER_MTOK=0.042`, `JEV_PRICE_OUTPUT_PER_MTOK=0`, USD per million tokens; not a published price), the 280 calls (1,176,975 input and 108,231 output tokens) cost an estimated USD 0.049.
+- Opus: the `claude` CLI reported USD 12.83 for the 250 calls (`reported:claude-cli`; 1,637,118 input and 67,248 output tokens). This is the CLI's own figure. On a subscription plan it is notional, not a bill. The CLI caches the prompt, so its reported cost runs about 1.8 times what the same call would cost through the API, and its token counts include the Claude Code harness's own context ([llm-baseline-notes.md](llm-baseline-notes.md)). No API run was made, and no price is built into the code.
 
 ## Known limits
 
@@ -108,4 +108,11 @@ The two costs come from different sources and must not be compared as like for l
 
 ## How to repeat
 
-Do the Jev batch from [results-2026-10-19-tier4-jev.md](results-2026-10-19-tier4-jev.md#how-to-repeat), then repeat both batch commands with `--engine claude-opus`. Without `ANTHROPIC_API_KEY` that uses the `claude` CLI, as here. With the key it uses the Anthropic API, which gives different latency and cost figures. Then run `python -m tier4 scorecard` and `export-lfedge` on the two Opus run directories.
+You do not need the Jev batch to run the Opus batch. It is only needed for the comparison.
+
+1. Start the cluster: `./setup-k8s.sh`, then `./health-check-k8s.sh`.
+2. Choose the transport. Without `ANTHROPIC_API_KEY`, the engine uses the `claude` CLI, as here; the CLI must be installed and logged in. With the key in `.env`, it uses the Anthropic API, which gives different latency and cost figures.
+3. Run the fault batch: `./run-all-remediation-experiments K001 K002 K003 K004 K005 K006 K007 K008 K009 K010 --repeats 3 --engine claude-opus` (about 5.5 hours here).
+4. Run the control: `./run-all-remediation-experiments K000 --repeats 10 --engine claude-opus` (about 2 hours here).
+5. Run `python -m tier4 scorecard` and `export-lfedge` on the two run directories.
+6. If a run is interrupted, run `python -m tier4 reset-faults` before anything else.

@@ -1,10 +1,10 @@
 # Tier 3 testbed notes (kind, LF Edge Kubernetes faults)
 
-Facts Tier 3 depends on, where each came from, and what is still unverified. Task group 1 in `openspec/changes/k8s-faults-tier3/tasks.md` fills in the open items on a real cluster. Change `tier3/testbed/pins.env`, the scenarios or the code only together with this file.
+This file lists the facts Tier 3 depends on, where each came from, and what is still unverified. Task group 1 in `openspec/changes/k8s-faults-tier3/tasks.md` fills in the open items on a real cluster. Change `tier3/testbed/pins.env`, the scenarios or the code only together with this file.
 
 ## LF Edge harness (read 2026-10-14, task 1.5)
 
-Source: `lfedgeai/AIOps`, `research/agentic_aiops_architectures/code/harness/run_harness.py`, commit `a408708` (2026-10-12). Read only; nothing from it is run here.
+Source: `lfedgeai/AIOps`, `research/agentic_aiops_architectures/code/harness/run_harness.py`, commit `a408708` (2026-10-12). We only read it. We run nothing from it.
 
 | Item | Their harness | Tier 3 |
 |---|---|---|
@@ -34,37 +34,37 @@ Per-run fields (`HarnessRun`) used by `python -m tier3 export-lfedge`: `run_id`,
 
 ## Host (task 1.1, 2026-10-14)
 
-30 GB RAM, about 9.2 GB available with the owner's other work running; 16 cores, load about 1.2; NVMe SSD, 359 GB free; Docker 29.8.2; Tier 2 stopped. Swap is zram (compressed RAM), so memory pressure costs CPU, not disk. The pre-check was lowered from 12 to 8 GB after trimming the demo (below); the measured footprint is recorded under task 1.4.
+30 GB RAM, about 9.2 GB available with the owner's other work running; 16 cores, load about 1.2; NVMe SSD, 359 GB free; Docker 29.8.2; Tier 2 stopped. Swap is zram (compressed RAM), so memory pressure costs CPU, not disk. We lowered the pre-check from 12 to 8 GB after trimming the demo (below). The measured footprint is recorded under task 1.4.
 
 ## Pinned versions (tasks 1.2-1.4)
 
 | Component | Pin | Verified |
 |---|---|---|
-| kind | `v0.29.0` | installed to `~/.local/bin`, SHA-256 checked against the release file (2026-10-14). Newer releases exist (v0.33.0); kept the pin |
+| kind | `v0.29.0` | installed to `~/.local/bin`, SHA-256 checked against the release file (2026-10-14). Newer releases exist (v0.33.0). The pin stays |
 | node image | `kindest/node:v1.33.1@sha256:0500722...b34f` | the default image listed in the v0.29.0 release notes |
 | kubectl | `v1.33.1` | from dl.k8s.io, SHA-256 checked |
-| helm | `v3.22.0` | from get.helm.sh, SHA-256 checked (Helm 4 exists; v3 kept) |
+| helm | `v3.22.0` | from get.helm.sh, SHA-256 checked (Helm 4 exists. v3 stays) |
 | CNI | kindnet (kind default) | **enforces NetworkPolicy** (task 1.3): kind has shipped `kube-network-policies` since v0.24.0 |
 | Demo chart | `open-telemetry/opentelemetry-demo` `0.42.4` (app 3.1.0) | 0.42.0-0.42.4 all carry app 3.1.0; newest taken |
 
 ## NetworkPolicy check (task 1.3, 2026-10-14)
 
-busybox `httpd` pod on jev-worker2, client on jev-worker3. Before: `wget` gets the page. With a deny-all ingress policy on the server: `wget: download timed out` (packets dropped, not refused). After deleting the policy: the page again. So `network_partition` makes calls to the target **time out**; callers should show latency and timeouts rather than immediate connection errors.
+busybox `httpd` pod on jev-worker2, client on jev-worker3. Before: `wget` gets the page. With a deny-all ingress policy on the server: `wget: download timed out` (packets dropped, not refused). After deleting the policy: the page again. So `network_partition` makes calls to the target time out. Callers are expected to show latency and timeouts rather than immediate connection errors.
 
 ## Chart facts (task 1.4, checked with `helm template` before install)
 
 - Every demo service is a Deployment named after it (`cart`, `valkey-cart`, `load-generator`, ...). Pods carry `opentelemetry.io/name`, `app.kubernetes.io/component` and `app.kubernetes.io/name` all equal to the service name.
 - Subchart pods carry only `app.kubernetes.io/name` and `/component`, with component values such as `server` (Prometheus) and `all-in-one` (Jaeger). The pod-to-service mapping therefore reads `opentelemetry.io/name` first (fixed 2026-10-14; it read `component` first).
-- The collector is a DaemonSet `otel-collector-agent` (presets: hostMetrics, kubeletMetrics, kubernetesAttributes, clusterMetrics). It is pinned to `jev-worker`; applications reach it through its Service, so it does not need a pod per node.
+- The collector is a DaemonSet `otel-collector-agent` (presets: hostMetrics, kubeletMetrics, kubernetesAttributes, clusterMetrics). It is pinned to `jev-worker`. Applications reach it through its Service, so it does not need a pod per node.
 - Placement keys: `default.schedulingRules.nodeSelector`, `components.<name>.schedulingRules.nodeSelector`, `opentelemetry-collector.nodeSelector`, `jaeger.jaeger.nodeSelector` (Jaeger chart 4.13.1), `prometheus.server.nodeSelector`, `opensearch.nodeSelector`. The render puts every application Deployment on `jev-role=app` and `jaeger`, `prometheus`, `opensearch`, the collector, `flagd`, `load-generator` and `opamp-server` on `jev-role=observability`.
 - Host NodePorts: `frontend-proxy` pods (`opentelemetry.io/name=frontend-proxy`, port 8080), Prometheus (`app.kubernetes.io/name=prometheus, component=server`, 9090), OpenSearch (`app.kubernetes.io/name=opensearch`, 9200). The selectors in `nodeports.yaml` match.
 - Demo 3.1.0 in the chart adds `agent`, `chatbot`, `mcp` (LLM assistant), `astronomy-db` (Postgres for product-catalog), `opamp-server` and `telemetry-docs`.
 
 ### Trimmed for memory
 
-Disabled in `values/demo.yaml`: `kafka`, `accounting` and `fraud-detection` (Kafka consumers), `agent`, `chatbot`, `mcp` (also not run in Tier 2: they live in `compose.agent.yaml`), `telemetry-docs` and Grafana. About 3 GB of memory limits. None is on the path of any Tier 3 scenario. `checkout` publishes to Kafka only when `KAFKA_ADDR` is set (`src/checkout/main.go`), so its `KAFKA_ADDR` is overridden to empty and its `wait-for-kafka` init container removed. Kept: `astronomy-db` and `opamp-server` (product-catalog depends on both).
+Disabled in `values/demo.yaml`: `kafka`, `accounting` and `fraud-detection` (Kafka consumers), `agent`, `chatbot`, `mcp` (also not run in Tier 2: they live in `compose.agent.yaml`), `telemetry-docs` and Grafana. Together they carry about 3 GB of memory limits. None is on the path of any Tier 3 scenario. `checkout` publishes to Kafka only when `KAFKA_ADDR` is set (`src/checkout/main.go`), so its `KAFKA_ADDR` is overridden to empty and its `wait-for-kafka` init container removed. The trim keeps `astronomy-db` and `opamp-server` (product-catalog depends on both).
 
-Tier 3 therefore has its own service list (`tier3/vocab.py`, 15 services): not Tier 2's, which has `kafka`, `accounting`, `fraud-detection` and `postgresql`.
+Tier 3 therefore has its own service list (`tier3/vocab.py`, 15 services). It is not Tier 2's list, which has `kafka`, `accounting`, `fraud-detection` and `postgresql`.
 
 ## Install and measured footprint (task 1.4, 2026-10-14)
 
@@ -73,10 +73,10 @@ Tier 3 therefore has its own service list (`tier3/vocab.py`, 15 services): not T
 Problems found and fixed in `values/demo.yaml`:
 
 1. `ad` (Java) was OOMKilled 5 times in its first 5 minutes with the chart's 300Mi limit. Raised to 500Mi; no restart since.
-2. **No application telemetry arrived.** Span metrics had only `flagd` and `frontend-web`, both on jev-worker. The collector is a DaemonSet, and in daemonset mode the chart gives its Service `internalTrafficPolicy: Local`. Pinned to jev-worker it has no pod on the application nodes, so their spans, metrics and logs were dropped. Set `opentelemetry-collector.service.internalTrafficPolicy: Cluster`; afterwards Jaeger lists every application service and span metrics cover the services under load.
-3. The collector logged errors every few seconds (kafkametrics without Kafka; kubeletstats TLS on kind; DNS for the disabled firepit) and ships its own logs to OpenSearch as service `otelcol-contrib`: 461 warn/error lines in 5 minutes, which would have topped every observation's `error_logs`. Removed the kafkametrics receiver and the kubeletMetrics preset, and `tier3/collect.py` now drops `otelcol-contrib`, `jaeger` (self-traces) and `opamp-server` from logs, traces, edges and service stats. The firepit DNS warning remains in the collector's own logs only.
+2. No application telemetry arrived. Span metrics had only `flagd` and `frontend-web`, both on jev-worker. The collector is a DaemonSet, and in daemonset mode the chart gives its Service `internalTrafficPolicy: Local`. Because it is pinned to jev-worker, it has no pod on the application nodes, so their spans, metrics and logs were dropped. Set `opentelemetry-collector.service.internalTrafficPolicy: Cluster`. Afterwards, Jaeger lists every application service and span metrics cover the services under load.
+3. The collector logged errors every few seconds (kafkametrics without Kafka, kubeletstats TLS on kind, and DNS for the disabled firepit) and shipped its own logs to OpenSearch as service `otelcol-contrib`: 461 warn/error lines in 5 minutes, which would have topped every observation's `error_logs`. We removed the kafkametrics receiver and the kubeletMetrics preset. `tier3/collect.py` now drops `otelcol-contrib`, `jaeger` (self-traces) and `opamp-server` from logs, traces, edges and service stats. The firepit DNS warning remains in the collector's own logs only.
 
-Baseline after the fixes, 10 users: span metrics for ad, cart, currency, frontend, frontend-proxy, image-provider, product-catalog, quote, recommendation and shipping (checkout, payment and email appear when orders are placed), all with error rate 0.000; frontend about 11 req/s, p95 about 37 ms.
+Baseline after the fixes, with 10 users: span metrics exist for ad, cart, currency, frontend, frontend-proxy, image-provider, product-catalog, quote, recommendation and shipping (checkout, payment and email appear when orders are placed), all with error rate 0.000. Frontend is about 11 req/s, p95 about 37 ms.
 
 Measured after settling (`docker stats`, 17:51):
 
@@ -109,16 +109,16 @@ Each fault was injected by hand with `tier3/testbed/probe_fault.py` (the real in
 
 ### What the probes settled
 
-- **Rolling updates (task 1.7).** With one replica the Deployment keeps the old pod until the new one is Ready. `readiness_probe_fail`: the new pod is never Ready, so the old pod serves and users see nothing; the evidence is the stuck rollout and Unhealthy events. `memory_limit`: the 10Mi pod does start and pass readiness, so the old pod is removed and users get errors at once; the OOM kills come later. `config_corruption`: an ordinary rollout.
-- **`config_corruption` (task 1.8).** No service in demo 3.1.0 reads `DATABASE_HOST` (cart reads `VALKEY_ADDR`), and on the cluster the fault is a rolling restart and nothing else. For the group: on this demo version their fault is a no-op.
-- **`network_partition` is latent.** kindnet (kube-network-policies) enforces the policy for new connections: a new TCP connect from the load-generator pod to `cart:8080` timed out after 5 s while the policy was in place, and connected at once after reset. But the frontend keeps a long-lived gRPC connection to cart, and established connections are let through, so user traffic never notices. Calico and most iptables-based enforcers also accept established flows, so the group's harness likely sees the same unless the caller reconnects.
-- **`kill_pod` (task 1.9).** The replacement is Ready before the first poll; a 1% error blip shows in span metrics for about 45 s. It heals itself.
-- **`pvc_full` (task 1.9).** The cart pod has no PersistentVolumeClaim (no Tier 3 service has one) and `/tmp` is the container's writable layer on the host disk (929 GB, 344 GB free), so the write cannot fill a disk. The cart image has `sh` and `dd`. The 500 MB write fills page cache, which counts against cart's 160Mi memory limit, and the container is OOMKilled mid-write (exit 137) and restarts with a fresh writable layer, so the file is gone. The injector treats exit 137 followed by a reported restart as the fault taking effect, and restore treats a restarted container as the file removed (it waits up to 30 s for the kubelet to report the restart). On the cluster: one OOMKill and restart, a 500 for about 15 s, and a short error burst; it heals itself.
-- **Placement drifts.** After `node_taint` the evicted pods stay on jev-worker3 when the taint goes; a second `node_taint` on the empty node evicted nothing (the first rerun showed no effect at all). The health check now requires application pods on both app nodes, and `tier3/testbed/rebalance.sh` restarts the app Deployments one at a time to spread them again (restarting them all at once put every new pod on the empty node).
-- **Collection must not depend on an app node.** The first `node_taint` probe crashed: Jaeger was queried through frontend-proxy (`/jaeger/ui`), and frontend-proxy was evicted. Jaeger now has its own NodePort (`host-jaeger`, 30686, host port 19686 in `kind.yaml`; `TIER3_JAEGER_URL`). A cluster created before this change has no host port for it; set `TIER3_JAEGER_URL` to `http://<node IP>:30686` or recreate the cluster. Node IPs change when the containers restart (next item), so read the IP from `docker inspect` each time; the control plane's IP is a safe choice, since `node_taint` never targets it.
-- **Node IPs change on restart (2026-10-18).** After `stop.sh` and `start.sh`, Docker gave the four nodes new IPs in a different order (the control plane went back to 172.27.0.2; jev-worker3 took 172.27.0.5). The control plane's `/etc/kubernetes/kubelet.conf` held `server: https://172.27.0.5:6443`, so its kubelet hit worker3, got connection refused, and the node stayed `NotReady` (coredns pods on it stuck `Terminating`). The workers' kubelet.conf uses `https://jev-control-plane:6443` and was unaffected. The API server certificate lists `DNS:jev-control-plane`, so `start.sh` now points the control plane's kubelet at the name and restarts it. `start.sh` also waits for `/readyz` before `kubectl wait`, which otherwise fails at once while the API server is starting (this broke the scheduled 02:00 run).
-- **Most faults emit only Normal events.** The observation carries Warning events only, so for scale_zero, dependency_removal, replica_overload, kill_pod, config_corruption and node_taint the engine sees replica counts, pod and node state and telemetry, not events. The only Warning events seen in all ten probes were `BackOff` (memory_limit) and `Unhealthy` with the message `Readiness probe failed: ` (readiness_probe_fail); no `OOMKilling` or `FailedScheduling` event appeared (jev-worker3 had room).
-- **No self-describing strings (task 1.10).** Every event captured in the probes (all types) was scanned for `jev-fault`, `harness` and the ten fault names: none found. The NetworkPolicy and the taint key never appear in an event; the readiness probe's command does not appear in the Unhealthy message. The leak-test fixtures in `tests/tier3/helpers.py` stay as written: they are a superset (they also plant the taint key and fault names) of what the cluster produced.
+- Rolling updates (task 1.7). With one replica, the Deployment keeps the old pod until the new one is Ready. With `readiness_probe_fail`, the new pod is never Ready, so the old pod serves and users see nothing. The evidence is the stuck rollout and Unhealthy events. With `memory_limit`, the 10Mi pod does start and pass readiness, so the old pod is removed and users get errors at once. The OOM kills come later. `config_corruption` is an ordinary rollout.
+- `config_corruption` (task 1.8). No service in demo 3.1.0 reads `DATABASE_HOST` (cart reads `VALKEY_ADDR`), and on the cluster the fault is a rolling restart and nothing else. For the group, their fault is a no-op on this demo version.
+- `network_partition` is latent. kindnet (kube-network-policies) enforces the policy for new connections: a new TCP connect from the load-generator pod to `cart:8080` timed out after 5 s while the policy was in place, and connected at once after reset. But the frontend keeps a long-lived gRPC connection to cart, and the policy lets established connections through, so user traffic never notices. Calico and most iptables-based enforcers also accept established flows, so the group's harness likely sees the same unless the caller reconnects.
+- `kill_pod` (task 1.9). The replacement is Ready before the first poll. A 1% error blip shows in span metrics for about 45 s. It heals itself.
+- `pvc_full` (task 1.9). The cart pod has no PersistentVolumeClaim (no Tier 3 service has one) and `/tmp` is the container's writable layer on the host disk (929 GB, 344 GB free), so the write cannot fill a disk. The cart image has `sh` and `dd`. The 500 MB write fills page cache, which counts against cart's 160Mi memory limit, and the container is OOMKilled mid-write (exit 137) and restarts with a fresh writable layer, so the file is gone. The injector treats exit 137 followed by a reported restart as the fault taking effect, and restore treats a restarted container as the file removed (it waits up to 30 s for the kubelet to report the restart). On the cluster, the result is one OOMKill and restart, a 500 for about 15 s, and a short error burst. It heals itself.
+- Placement drifts. After `node_taint`, the evicted pods stay on jev-worker3 when the taint goes. A second `node_taint` on the empty node evicted nothing (the first rerun showed no effect at all). The health check now requires application pods on both app nodes, and `tier3/testbed/rebalance.sh` restarts the app Deployments one at a time to spread them again (restarting them all at once put every new pod on the empty node).
+- Collection must not depend on an app node. The first `node_taint` probe crashed: Jaeger was queried through frontend-proxy (`/jaeger/ui`), and frontend-proxy was evicted. Jaeger now has its own NodePort (`host-jaeger`, 30686, host port 19686 in `kind.yaml`; `TIER3_JAEGER_URL`). A cluster created before this change has no host port for it. Set `TIER3_JAEGER_URL` to `http://<node IP>:30686` or recreate the cluster. Node IPs change when the containers restart (next item), so read the IP from `docker inspect` each time. The control plane's IP is a safe choice, since `node_taint` never targets it.
+- Node IPs change on restart (2026-10-18). After `stop.sh` and `start.sh`, Docker gave the four nodes new IPs in a different order (the control plane went back to 172.27.0.2, and jev-worker3 took 172.27.0.5). The control plane's `/etc/kubernetes/kubelet.conf` held `server: https://172.27.0.5:6443`, so its kubelet hit worker3, got connection refused, and the node stayed `NotReady` (coredns pods on it stuck `Terminating`). The workers' kubelet.conf uses `https://jev-control-plane:6443` and was unaffected. The API server certificate lists `DNS:jev-control-plane`, so `start.sh` now points the control plane's kubelet at the name and restarts it. `start.sh` also waits for `/readyz` before `kubectl wait`, which otherwise fails at once while the API server is starting (this broke the scheduled 02:00 run).
+- Most faults emit only Normal events. The observation carries Warning events only, so for scale_zero, dependency_removal, replica_overload, kill_pod, config_corruption and node_taint the engine sees replica counts, pod and node state and telemetry, not events. The only Warning events seen in all ten probes were `BackOff` (memory_limit) and `Unhealthy` with the message `Readiness probe failed: ` (readiness_probe_fail). No `OOMKilling` or `FailedScheduling` event appeared (jev-worker3 had room).
+- No self-describing strings (task 1.10). Every event captured in the probes (all types) was scanned for `jev-fault`, `harness` and the ten fault names: none found. The NetworkPolicy and the taint key never appear in an event; the readiness probe's command does not appear in the Unhealthy message. The leak-test fixtures in `tests/tier3/helpers.py` stay as written: they are a superset (they also plant the taint key and fault names) of what the cluster produced.
 
 ## Dropped or changed scenarios
 
@@ -130,13 +130,14 @@ No scenario was dropped: all ten of the group's faults stay in the catalogue so 
 | K004 network_partition | incident, cart, network_blocked | no incident, none, none | nothing observable; existing connections survive the policy |
 | K006 config_corruption | incident, cart, misconfiguration | no incident, none, none | the variable is not read; only a routine rollout |
 | K010 pvc_full | incident, cart, disk_full | no incident, cart, oom_killed | no volume to fill; the write gets the container OOMKilled once and it heals itself |
+
 K003, K005, K007, K008 and K009 keep their expected outcomes; their rationales now quote the measured behaviour. K005 stays an incident although users are not hurt: the rollout is broken and needs attention.
 
 ## Tier 4: remediation and MTTR (change `k8s-remediation-tier4`)
 
 ### How the group's harness measures MTTR (read 2026-10-18, task 1.1)
 
-Source: `lfedgeai/AIOps`, `research/agentic_aiops_architectures/code/harness/run_harness.py` and `fault_verification.py`, commit `a408708`. Read only.
+Source: `lfedgeai/AIOps`, `research/agentic_aiops_architectures/code/harness/run_harness.py` and `fault_verification.py`, commit `a408708`. We only read it.
 
 | Field | Their harness | Tier 4 |
 |---|---|---|
@@ -148,7 +149,7 @@ Source: `lfedgeai/AIOps`, `research/agentic_aiops_architectures/code/harness/run
 
 ### Span metrics arrive every 60 s (2026-10-18)
 
-`traces_span_metrics_calls_total` has one sample every 60 s (five samples over 5 minutes, gaps of exactly 60 s). `increase()` needs two samples in its window, so a service-stats query over 15, 30, 45, 60 or 90 s returns no series at all; 120 s returns every service. Tier 3 never noticed because its windows are 120 to 180 s. Tier 4's first 10 probes used a 30 s window, so the service part of their recovery check saw no services and could never fail: those outcomes were decided by Kubernetes state alone and were discarded. The recovery check now uses 120 s (about the last minute of traffic), fails when the baseline had services and the current window has none, and holds for 60 s so every verified recovery spans a fresh sample. A shorter metrics interval would need a collector or Prometheus change on the testbed (it would also change Tier 3's inputs), so it is left for a later change.
+`traces_span_metrics_calls_total` has one sample every 60 s (five samples over 5 minutes, gaps of exactly 60 s). `increase()` needs two samples in its window, so a service-stats query over 15, 30, 45, 60 or 90 s returns no series at all. A 120 s window returns every service. Tier 3 never noticed because its windows are 120 to 180 s. Tier 4's first 10 probes used a 30 s window, so the service part of their recovery check saw no services and could never fail. Kubernetes state alone decided those outcomes, and we discarded them. The recovery check now uses 120 s (about the last minute of traffic), fails when the baseline had services and the current window has none, and holds for 60 s so every verified recovery spans a fresh sample. A shorter metrics interval would need a collector or Prometheus change on the testbed (it would also change Tier 3's inputs), so we left it for a later change.
 
 ### A pass can relapse (2026-10-18)
 
@@ -156,7 +157,7 @@ Probe K004 (`network_partition` on cart) with `restart_service` on cart: every c
 
 ### Action probes (tasks 1.3 to 1.5, 2026-10-18)
 
-`python -m tier4 probe <ID> <action> <component>` runs the real Tier 4 path with a scripted engine (always "incident", the given action and component; no Jev). Each fault on its Tier 3 target, each allowlisted action on that target, plus `restart_service` and `rollback_change` on `frontend` during the K000 control. 32 probes, all `ok`, every action saved, read back and restored, no ledger left. Records in `results/tier4/probe/`; the log is `results/tier4/probe-matrix.log`. MTTR is fault to action done; verified is fault to the start of the final passing run (must reach the end of the 360 s watch). Self is the self-recovery time when the check just before acting already passed.
+`python -m tier4 probe <ID> <action> <component>` runs the real Tier 4 path with a scripted engine (always "incident", the given action and component; no Jev). The matrix covers each fault on its Tier 3 target and each allowlisted action on that target, plus `restart_service` and `rollback_change` on `frontend` during the K000 control. There were 32 probes, all `ok`. Every action was saved, read back and restored, and no ledger was left. Records are in `results/tier4/probe/`, and the log is `results/tier4/probe-matrix.log`. MTTR is fault to action done. Verified is fault to the start of the final passing run (which must reach the end of the 360 s watch). Self is the self-recovery time when the check just before acting already passed.
 
 | Fault (target) | `scale_up` | `restart_service` | `rollback_change` | Reading |
 |---|---|---|---|---|
@@ -174,13 +175,13 @@ Probe K004 (`network_partition` on cart) with `restart_service` on cart: every c
 
 What follows for the live runs:
 
-- **Right action, right component, one fix each.** Replica faults (K001, K007, K008) are fixed only by `scale_up` on the right Deployment; template faults (K003, K005) only by `rollback_change`. `restart_service` fixed nothing in any probe. No allowlisted action fixes K004.
-- **Self-healing faults (K002, K006, K009, K010) do not measure remediation.** Whether a run is "by action" or "without action" depends only on whether the system is already passing at the check just before acting (about 16 to 20 s after injection). Report them separately and never count them towards an engine's verified MTTR.
-- **Verified MTTR equals MTTR when the fix lands before the fault's errors reach the span metrics** (K003, K005 at about 18 s): the service part of the check has not seen the errors yet, so it rests on Kubernetes state. Replica faults show errors first and verify 75 to 105 s after the fix (metrics every 60 s, 120 s window).
-- **`disturbed_healthy_system` is clean only on K000.** On a no-incident fault scenario a failing check after the action can come from the fault itself (K002, K006, K010) or from the action (K004).
-- **Rollout history (1.4).** `kubectl rollout undo` on cart picked the previous ReplicaSet revision every time (cart's revision grew from 80 to 132 over the matrix, from the faults, restores, restarts and rebalances); on the healthy `frontend` it rolled back to the revision `rebalance.sh` left (revision 12), which differs only in the restart annotation, so nothing visible changed. The first records stored the revision before the controller bumped it; fixed in `308eeca`.
-- **No self-describing markers (1.5).** A rollout restart writes only `kubectl.kubernetes.io/restartedAt` on the pod template (read back by the executor); `kubectl rollout undo` copies the previous ReplicaSet's template and adds nothing. Neither names the fault or the experiment, and the harness's restore removes the restart annotation again.
+- Right action, right component, one fix each. Replica faults (K001, K007, K008) are fixed only by `scale_up` on the right Deployment; template faults (K003, K005) only by `rollback_change`. `restart_service` fixed nothing in any probe. No allowlisted action fixes K004.
+- Self-healing faults (K002, K006, K009, K010) do not measure remediation. Whether a run is "by action" or "without action" depends only on whether the system is already passing at the check just before acting (about 16 to 20 s after injection). Report them separately and never count them toward an engine's verified MTTR.
+- Verified MTTR equals MTTR when the fix lands before the fault's errors reach the span metrics (K003, K005 at about 18 s). The service part of the check does not yet see the errors, so it rests on Kubernetes state. Replica faults show errors first and verify 75 to 105 s after the fix (metrics every 60 s, 120 s window).
+- `disturbed_healthy_system` is clean only on K000. On a no-incident fault scenario a failing check after the action can come from the fault itself (K002, K006, K010) or from the action (K004).
+- Rollout history (1.4). `kubectl rollout undo` on cart picked the previous ReplicaSet revision every time (cart's revision grew from 80 to 132 over the matrix, from the faults, restores, restarts and rebalances). On the healthy `frontend` it rolled back to the revision `rebalance.sh` left (revision 12), which differs only in the restart annotation, so nothing visible changed. The first records stored the revision before the controller bumped it. We fixed this in `308eeca`.
+- No self-describing markers (1.5). A rollout restart writes only `kubectl.kubernetes.io/restartedAt` on the pod template (read back by the executor); `kubectl rollout undo` copies the previous ReplicaSet's template and adds nothing. Neither names the fault or the experiment, and the harness's restore removes the restart annotation again.
 
 ### Recovery-check noise on the healthy cluster (task 1.6, 2026-10-18)
 
-`python -m tier4 probe K000 no_action none`: no fault, no action, the recovery check run for the full 360 s. 25 of 25 checks passed (`results/tier4/noise/`). Together with the two K000 frontend probes (25 of 25 each), 75 checks on a healthy cluster and none failed, so the check does not fail on noise at the Tier 2 deviation thresholds. Nothing was tuned.
+`python -m tier4 probe K000 no_action none` ran with no fault, no action, and the recovery check for the full 360 s. 25 of 25 checks passed (`results/tier4/noise/`). Together with the two K000 frontend probes (25 of 25 each), 75 checks ran on a healthy cluster and none failed, so the check does not fail on noise at the Tier 2 deviation thresholds. Nothing was tuned.

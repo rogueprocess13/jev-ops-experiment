@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Status: **implemented** (v0.1.0, 2026-10-19). This file is the original implementation prompt that kicked off the project, kept as written. Everything below was built as Tier 1 and run against real Jev ([docs/results-2026-10-18-tier1-jev.md](docs/results-2026-10-18-tier1-jev.md)). Tiers 2 to 4 went beyond this plan and are specified in `openspec/changes/`.
+Status: **implemented** (v0.1.0, 2026-10-19). This file is the original implementation prompt for the project, kept as written. The project built everything below as Tier 1 and ran it against real Jev ([docs/results-2026-10-18-tier1-jev.md](docs/results-2026-10-18-tier1-jev.md)). Tiers 2 to 4 go beyond this plan. They are specified in `openspec/changes/`. The limits below (no Kubernetes, Prometheus, Grafana or Docker Compose) applied to this first version, which is now Tier 1. They still apply to Tier 1. They do not apply to the later tiers.
 
 Use this as the implementation prompt. It keeps the first version deliberately small and leaves room to evolve it later.
 

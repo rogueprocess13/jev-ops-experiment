@@ -1,6 +1,6 @@
 # Results: Jev on Tier 4, closed-loop remediation on kind (2026-10-19)
 
-This page summarizes the first full live Tier 4 batch. Tier 4 runs Tier 3's eleven scenarios on the same kind cluster. After the first poll that reports an incident, it carries out Jev's recommended action on Jev's named component, once. Then it watches for 360 seconds whether the system recovers. The Tier 3 summary, which uses the same faults and the same questions but never acts, is in [results-2026-10-18-tier3-jev.md](results-2026-10-18-tier3-jev.md).
+This page summarizes the first full live Tier 4 batch. Tier 4 runs Tier 3's eleven scenarios on the same kind cluster. After the first poll that reports an incident, it carries out Jev's recommended action on Jev's named component, once. Then it watches for 360 seconds to see whether the system recovers. The Tier 3 summary, which uses the same faults and the same questions but never acts, is in [results-2026-10-18-tier3-jev.md](results-2026-10-18-tier3-jev.md).
 
 Every figure on this page comes from the 40 run records listed below (`evaluation`, `polls`, `timing`, `usage` and `remediation` fields), through `python -m tier4 scorecard` and `export-lfedge`.
 
@@ -18,16 +18,16 @@ Each fault scenario ran three times, and the control (K000) ran ten times: 40 ru
 | Control runs | `results/tier4/20261019-050044-6cc4/`, `./run-all-remediation-experiments K000 --repeats 10` (07:00 to 09:05) |
 | Exports | `results/tier4/6.2-combined-scorecard.md`, `6.2-combined-lfedge.jsonl` (both run directories) |
 
-The single pass from task 6.1 (`results/tier4/20261018-210528-2703/` and `20261018-212756-f595/`) was used to read the requests by hand and check every action's record and restore. It is not in the figures below. We also searched every stored request of the 40 runs for the ten fault names, `jev-fault`, `flagd`, `feature_flag`, the scenario ID, `ground_truth`, `expected`, `remediation`, `recovered` and the expected diagnosis and action labels (other than `none`, `unknown` and `no_action`). We found none.
+The single pass from task 6.1 (`results/tier4/20261018-210528-2703/` and `20261018-212756-f595/`) was a pass where we read the requests by hand and checked every action's record and restore. It is not in the figures below. We also searched every stored request of the 40 runs for the ten fault names, `jev-fault`, `flagd`, `feature_flag`, the scenario ID, `ground_truth`, `expected`, `remediation`, `recovered` and the expected diagnosis and action labels (other than `none`, `unknown` and `no_action`). We found none.
 
 A run took 601 to 813 seconds (median 662): Tier 3's run plus the 360-second recovery watch.
 
 ## How a run differs from Tier 3
 
 1. Polling is Tier 3's (every 15 s, first poll after 15 s), but every scenario stops at the first poll that reports an incident.
-2. That poll's action and component are carried out once, from a fixed allowlist: `scale_up` (replicas to baseline if below it, else one more, never above 3), `restart_service` (rollout restart), `rollback_change` (`kubectl rollout undo`). `investigate`, `escalate` and `no_action` do nothing. Only Deployments in the demo namespace can be acted on.
-3. The target's state is saved to the ledger before the action and read back after.
-4. The fault stays injected during the watch, so only the action can fix it. **Recovered** means every Deployment at baseline availability with its rollout complete, every application pod Ready and no service deviating from baseline, for at least the last 60 seconds of the 360-second watch.
+2. The harness carries out that poll's action on that poll's component once, from a fixed allowlist: `scale_up` (replicas to baseline if below it, else one more, never above 3), `restart_service` (rollout restart), `rollback_change` (`kubectl rollout undo`). `investigate`, `escalate` and `no_action` do nothing. The harness acts only on Deployments in the demo namespace.
+3. The harness saves the target's state to the ledger before the action and reads it back after.
+4. The watch starts when the action is done, or right after the scored poll when the harness carries out nothing. The fault stays injected during the watch, so only the action can fix it. Recovered means every Deployment is at baseline availability with its rollout complete, every application pod is Ready and no service deviates from baseline, for at least the last 60 seconds of the 360-second watch.
 5. Reset undoes the action first, then the fault.
 
 Jev is never asked again after the action, so nothing about the action or the recovery can reach a request.
@@ -89,9 +89,9 @@ On the no-incident scenarios and the control, Jev's scored answer led to one act
 
 "Remediation correct" was 18/18, but only 4 of 18 incident runs were fixed by the action. Three things explain the gap, all visible in the records:
 
-- **`investigate` is accepted but does nothing.** It is in the accepted list for every incident scenario, and Jev chose it in 11 of 18 runs: every K003, K005 and K009 run and two K007 runs. On K003 and K005, Jev named the right component and diagnosis every time, but `rollback_change`, the action that undoes the template change, was never chosen.
-- **The right action on the wrong component fixes nothing.** In 3 runs (K001 once, K008 twice) Jev chose `scale_up` but named frontend, the caller that logged the errors, instead of cart, which had no pods. The harness scaled frontend 1 -> 2 and cart stayed at zero.
-- **When component and action are both right, the fix works and is fast.** All 4 runs with the right component and `scale_up` recovered. Verified MTTR was 106 seconds in each: about 16 seconds to the first poll and the action, then about 90 seconds until the service-level checks passed and kept passing.
+- `investigate` is accepted but does nothing. It is in the accepted list for every incident scenario, and Jev chose it in 11 of 18 runs: every K003, K005 and K009 run and two K007 runs. On K003 and K005, Jev named the right component and diagnosis every time, but it never chose `rollback_change`, the action that undoes the template change.
+- The right action on the wrong component fixes nothing. In 3 runs (K001 once, K008 twice) Jev chose `scale_up` but named frontend, the caller that logged the errors, instead of cart, which had no pods. The harness scaled frontend 1 -> 2 and cart stayed at zero.
+- When component and action are both right, the fix works and is fast. All 4 runs with the right component and `scale_up` recovered. Verified MTTR was 106 seconds in each: about 16 seconds to the first poll and the action, then about 90 seconds until the service-level checks passed and kept passing.
 
 Jev never chose `restart_service`, `rollback_change` or `escalate` on any of the 280 polls. Three runs for each fault are too few to give rates. Read the results as a direction.
 
@@ -105,11 +105,11 @@ Jev never chose `restart_service`, `rollback_change` or `escalate` on any of the
 | `mttr_verified_seconds` | fault to the injected target's spec and readiness check passing, per fault type, no hold; never for `kill_pod`, `pvc_full`, `node_taint` | fault to the start of the final run of service-level checks (all Deployments, pods and services back to baseline), held for at least 60 s to the end of a 360 s watch |
 | Healthy control | skip-injection mode, false alarms not scored | K000, every poll scored; actions on false alarms recorded |
 
-Compare `mttr_seconds` only as "time to first action". Our verified MTTR is stricter than theirs and is single-shot. Four of our scenarios (K002, K004, K006, K010) expect no incident on this cluster. The group's agents may have been scored on those faults as incidents. In the LF Edge export, K010 run 1 carries an `mttr_seconds` and `mttr_verified_seconds` because an action was written and the checks passed. It is a false-alarm action, and the scorecard does not count it toward Jev's MTTR.
+Compare `mttr_seconds` only as "time to first action". Our verified MTTR is stricter than theirs and is single-shot. Four of our scenarios (K002, K004, K006, K010) expect no incident on this cluster. It is possible that the group's agents were scored on those faults as incidents. In the LF Edge export, K010 run 1 carries an `mttr_seconds` and `mttr_verified_seconds` because an action was written and the checks passed. It is a false-alarm action, and the scorecard does not count it toward Jev's MTTR.
 
 ## Cost
 
-Jev reports no cost. With the user-set `JEV_PRICE_*` prices, the 280 calls (1,176,975 input and 108,231 output tokens) cost an estimated USD 0.049. Jev answered in 360 to 1,011 ms (median 429 ms) and returned no reasoning text.
+Jev reports no cost. With the user-set prices (`JEV_PRICE_INPUT_PER_MTOK=0.042`, `JEV_PRICE_OUTPUT_PER_MTOK=0`, USD per million tokens, as in Tier 3; not a published price), the 280 calls (1,176,975 input and 108,231 output tokens) cost an estimated USD 0.049. Jev answered in 360 to 1,011 ms (median 429 ms) and returned no reasoning text.
 
 ## Known limits
 

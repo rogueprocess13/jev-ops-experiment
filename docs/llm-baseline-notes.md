@@ -12,10 +12,10 @@ Source: the Claude API reference bundled with Claude Code 2.1.289 (Python SDK RE
 - Effort: `output_config.effort` (`low`, `medium`, `high`, `xhigh`, `max`). Opus 5.5 defaults to `medium` and Sonnet 5.5 to `high`, so the engine always sends `LLM_EFFORT` (default `medium`) explicitly.
 - Thinking: adaptive by default. It cannot be disabled on Opus 5.5 (`{"type": "disabled"}` is a 400). The engine does not send `thinking`. `max_tokens` is 16000 so thinking has room before the JSON answer.
 - Sampling: `temperature`, `top_p` and `top_k` are rejected on these models, so Claude runs are not deterministic.
-- Refusals: HTTP 200 with `stop_reason: "refusal"` and `stop_details.category`. The engine records `invalid` with `refusal: <category>`. Anthropic recommends enabling server-side refusal fallbacks (`fallbacks`), which re-run the request on another model. They are **deliberately not enabled**: the benchmark has to know which model made each decision.
+- Refusals: HTTP 200 with `stop_reason: "refusal"` and `stop_details.category`. The engine records `invalid` with `refusal: <category>`. Anthropic recommends enabling server-side refusal fallbacks (`fallbacks`), which re-run the request on another model. They are deliberately not enabled: the benchmark has to know which model made each decision.
 - Errors: the SDK's typed exceptions. `RateLimitError` (429), `InternalServerError` (5xx) and `APIConnectionError` are retried up to 3 times with backoff by the engine (SDK retries are set to 0 so attempts can be counted). Any other `APIStatusError` (for example 401) is an immediate `error`.
 - Usage: `usage.input_tokens`, `usage.output_tokens`, `usage.cache_creation_input_tokens`, `usage.cache_read_input_tokens`. The engine reports input tokens as the sum of the three input fields. Thinking tokens are billed as output tokens (the extended-thinking page says `usage.output_tokens_details.thinking_tokens` reports "how many of the billed output tokens were internal reasoning").
-- Prices (2026-10-05, standard first-party API, USD per million tokens): Sonnet 5.5 $2 input / $10 output; Opus 5.5 $4 input / $20 output. **Not built into the code.** Set `CLAUDE_SONNET_PRICE_*` / `CLAUDE_OPUS_PRICE_*` to estimate cost. `.env.example` lists these values as commented examples.
+- Prices (2026-10-05, standard first-party API, USD per million tokens): Sonnet 5.5 $2 input / $10 output; Opus 5.5 $4 input / $20 output. The code does not build them in. Set `CLAUDE_SONNET_PRICE_*` / `CLAUDE_OPUS_PRICE_*` to estimate cost. `.env.example` lists these values as commented examples.
 
 ## Claude via the CLI fallback (`ClaudeCLIEngine`)
 
@@ -64,13 +64,13 @@ One run each, `--scenario degraded --seed 1234`, both HTTP 200 / exit 0 and pars
 
 Isolation: the CLI's 2,322 input tokens are close to the size of our own prompt and schema (Ollama's tokenizer counts 2,197 for the same request), and only one model appears in `modelUsage`. Claude Code's default system prompt, tool definitions and this repo's `CLAUDE.md` would add many thousands of tokens, so none of them reached the model. `--setting-sources ""` is accepted by this CLI version. `num_turns` is 2: the CLI delivers structured output through an extra internal turn.
 
-Cost: the CLI reported $0.010564. That matches Anthropic's list price for a **1-hour cache write** of the whole prompt (2,320 × $4/MTok, twice the base input price) plus 128 × $10/MTok output. The CLI caches the prompt and the API engine does not, so CLI-reported cost runs about 1.8× what the same call would cost through the API. Compare cost only between runs with the same transport.
+Cost: the CLI reported $0.010564. That matches Anthropic's list price for a 1-hour cache write of the whole prompt (2,320 × $4/MTok, twice the base input price) plus 128 × $10/MTok output. The CLI caches the prompt and the API engine does not, so CLI-reported cost runs about 1.8× what the same call would cost through the API. Compare cost only between runs with the same transport.
 
 ## Tier 3 and Tier 4 Claude baseline (`tier3/claude_engine.py`)
 
 Added 2026-10-18. The same transports and settings as above (model IDs, `LLM_EFFORT`, `max_tokens`, retries, the CLI isolation flags and environment), with Tier 3's question set instead of Tier 1's:
 
-- The questions and option descriptions are `tier3/questions.py`, the same objects the Jev adapter sends. `incident_detected` is Jev's yes/no (`noul`) question; for Claude its options are the strings `true` / `false` (Jev answers a probability, scored at 0.5 or more).
+- The questions and option descriptions are `tier3/questions.py`, the same objects the Jev adapter sends. `incident_detected` is Jev's yes/no (`noul`) question. For Claude its options are the strings `true` / `false` (Jev answers a probability, scored at 0.5 or more).
 - The observation is wrapped as `{"observations": ...}`, the key the Jev adapter uses.
 - The JSON schema allows exactly the four answer sets. The parser is strict: a missing or out-of-set value is `invalid`. Claude reports no confidence, so `confidence` is null.
 - Cost: `total_cost_usd` from the CLI (`reported:claude-cli`), else an estimate from `CLAUDE_OPUS_PRICE_*`, else null.

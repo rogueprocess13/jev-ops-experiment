@@ -1,6 +1,6 @@
 # OpenTelemetry Demo notes (Tier 2)
 
-Verified against the OpenTelemetry Demo **3.1.0** (released 2026-09-18) running under Docker Compose on one host, on 2026-10-02. Everything below was observed, not taken from the demo's documentation. Re-check it if you change the pinned version.
+Verified against the OpenTelemetry Demo 3.1.0 (released 2026-09-18) running under Docker Compose on one host, on 2026-10-02. Everything below was observed, not taken from the demo's documentation. Re-check it if you change the pinned version.
 
 ## Versions that run
 
@@ -12,33 +12,33 @@ All demo images are `ghcr.io/open-telemetry/demo:3.1.0-*`. The demo's own `.env`
 |---|---|
 | Shop, flagd-ui, Locust, Jaeger, Grafana | Envoy on `http://localhost:8080` (`/feature`, `/loadgen/`, `/jaeger/ui/`, `/grafana/`) |
 | Prometheus | `http://localhost:9090` (fixed host port) |
-| OpenSearch | **random host port**. Ask Docker: `docker port opensearch 9200` (`TIER2_OPENSEARCH_URL` overrides) |
+| OpenSearch | random host port. Ask Docker: `docker port opensearch 9200` (`TIER2_OPENSEARCH_URL` overrides) |
 | Other service ports | not fixed on the host; use Envoy |
 
 The full stack needs about 8 GB free (container limits sum to about 6.7 GB). Images are several GB to pull. Span metrics appear in Prometheus about 2 to 3 minutes after start.
 
 ## Fault injection
 
-- flagd reads `src/flagd/demo.flagd.json` (18 flags, all `off`). It **hot-reloads within about a second** of the file changing (seen in flagd's log as `filepath event ... WRITE`).
-- Toggle path used: flagd-ui API through Envoy. `GET /feature/api/read` returns `{"flags": ...}`; `POST /feature/api/write` takes `{"data": <whole config>}` and **replaces** the config, so every change is read, modify, write. Write is atomic (temp file then rename).
-- **Flag shapes.** Most flags are enabled by setting `defaultVariant`. `productCatalogFailure` has `targeting.if: [{"==": [{"var": "product_id"}, "OLJCESPC7Z"]}, "off", "off"]`. Targeting overrides `defaultVariant`, so it is enabled by setting the matched branch `targeting.if[1]` to `"on"` (this is what flagd-ui does). Only product `OLJCESPC7Z` then fails.
-- **The flag file changes on disk.** flagd-ui rewrites it as `{"flags": ...}`, dropping the `$schema` key and reformatting. After a reset every flag value is identical to the pinned file; `git status` in the checkout still shows it modified. `git checkout src/flagd/demo.flagd.json` there restores it exactly.
+- flagd reads `src/flagd/demo.flagd.json` (18 flags, all `off`). It hot-reloads within about a second of the file changing (seen in flagd's log as `filepath event ... WRITE`).
+- Toggle path used: flagd-ui API through Envoy. `GET /feature/api/read` returns `{"flags": ...}`; `POST /feature/api/write` takes `{"data": <whole config>}` and replaces the config, so every change is read, modify, write. Write is atomic (temp file then rename).
+- Flag shapes: most flags are enabled by setting `defaultVariant`. `productCatalogFailure` has `targeting.if: [{"==": [{"var": "product_id"}, "OLJCESPC7Z"]}, "off", "off"]`. Targeting overrides `defaultVariant`, so it is enabled by setting the matched branch `targeting.if[1]` to `"on"` (this is what flagd-ui does). Only product `OLJCESPC7Z` then fails.
+- The flag file changes on disk. flagd-ui rewrites it as `{"flags": ...}`, dropping the `$schema` key and reformatting. After a reset every flag value is identical to the pinned file; `git status` in the checkout still shows it modified. `git checkout src/flagd/demo.flagd.json` there restores it exactly.
 - `paymentFailure` variant `"90%"` is actually 0.95.
 - `flagd.evaluation.*` spans and `feature_flag` attributes appear in telemetry. They would reveal the fault, so the collectors exclude `flagd` and the scrubber removes them (see the README).
 
 ## Telemetry
 
 - Metrics: `traces_span_metrics_calls_total` and `traces_span_metrics_duration_milliseconds_bucket`, labels `service_name`, `span_kind`, `span_name`, `status_code` (`STATUS_CODE_ERROR`, `STATUS_CODE_OK`, `STATUS_CODE_UNSET`). Tier 2 uses server and consumer spans only.
-- **SDKs export every 60 s**, so `rate()` over a short range returns nothing. Use `increase()` over at least 180 s, evaluated at a fixed time.
+- SDKs export every 60 s, so `rate()` over a short range returns nothing. Use `increase()` over at least 180 s, evaluated at a fixed time.
 - Traces: Jaeger API at `/jaeger/ui/api/services` and `/jaeger/ui/api/traces?service=...&tags={"error":"true"}` through Envoy.
-- Logs: OpenSearch index `otel-logs*`, fields `resource.service.name`, `body`, `severity.number`, `@timestamp`. **`severity.text` is inconsistent** (`INFO`, `info`, `Information`, `error`, `Error`, `warn`, `WARN`, `Warning`), so filter on `severity.number` (13 and up warn, 17 and up error).
+- Logs: OpenSearch index `otel-logs*`, fields `resource.service.name`, `body`, `severity.number`, `@timestamp`. `severity.text` is inconsistent (`INFO`, `info`, `Information`, `error`, `Error`, `warn`, `WARN`, `Warning`), so filter on `severity.number` (13 and up warn, 17 and up error).
 - Services seen: accounting, ad, cart, checkout, currency, email, flagd, flagd-ui, fraud-detection, frontend, frontend-proxy, frontend-web (browser), image-provider, load-generator, payment, product-catalog, quote, recommendation, shipping, telemetry-docs. The last four (flagd, flagd-ui, telemetry-docs, load-generator) are excluded from observations.
 
 ## Load
 
-Locust through Envoy: `GET /loadgen/stats/requests` (`state`, `user_count`), `POST /loadgen/swarm` with `user_count` and `spawn_rate`. Default is 5 users. **At 30 users the stack looked CPU-saturated**: baseline p95 latencies of several seconds (frontend about 11 s, checkout about 9 s, product-catalog about 4 s). The scenarios use 10 users. After changing the user count, wait several minutes before taking a baseline; a baseline taken right after a change still carried the old load (frontend p95 15 s dropped to 1.9 s).
+Locust through Envoy: `GET /loadgen/stats/requests` (`state`, `user_count`), `POST /loadgen/swarm` with `user_count` and `spawn_rate`. Default is 5 users. At 30 users the stack looked CPU-saturated: baseline p95 latencies of several seconds (frontend about 11 s, checkout about 9 s, product-catalog about 4 s). The scenarios use 10 users. After changing the user count, wait several minutes before taking a baseline. A baseline taken right after a change still carried the old load (frontend p95 15 s dropped to 1.9 s).
 
-**Baseline noise.** A healthy system is not silent: `accounting` ("receive orders", a Kafka consumer span) shows a small error rate, `load-generator` shows errors, and some p95 values sit at the histogram ceiling. This is why the healthy control (F000) matters.
+Baseline noise: a healthy system is not silent: `accounting` ("receive orders", a Kafka consumer span) shows a small error rate, `load-generator` shows errors, and some p95 values sit at the histogram ceiling. This is why the healthy control (F000) matters.
 
 ## Flags verified
 
@@ -64,6 +64,6 @@ Not tried: `adFailure`, `adManualGc`, `emailMemoryLeak`, `recommendationCacheFai
 
 ## Ground-truth judgement calls
 
-- **F004** expects `checkout` as the affected service (the defect is in checkout's connection to payment), diagnosis `dependency_unreachable`. An engineer could reasonably say `payment`. Read results with that in mind.
-- **F005** expects `frontend-proxy` (where the delay is injected); the browser-facing symptom is in `frontend-web`.
-- **F001** is a one-product failure, not a whole-service failure.
+- F004 expects `checkout` as the affected service (the defect is in checkout's connection to payment), diagnosis `dependency_unreachable`. An engineer could reasonably say `payment`. Read results with that in mind.
+- F005 expects `frontend-proxy` (where the delay is injected); the browser-facing symptom is in `frontend-web`.
+- F001 is a one-product failure, not a whole-service failure.

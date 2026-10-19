@@ -1,19 +1,19 @@
 # Results: Jev vs. three LLMs on Tier 1 (2026-10-05)
 
-A one-page summary of the first full comparison run. It covers Tier 1 only (synthetic data). Tier 2, on the live OpenTelemetry Demo, has not been run yet.
+A one-page summary of the first full comparison run. It covers Tier 1 only (synthetic data). When it was written, Tier 2 (the live OpenTelemetry Demo) had not been run yet. It ran on 2026-10-12 ([results-2026-10-12-tier2-jev.md](results-2026-10-12-tier2-jev.md)).
 
 ## What we tested
 
 We generated 70 made-up server situations and asked four engines the same questions about each one:
 
-- **Severity**: how bad is it? (normal, degraded, high, critical)
-- **Action**: what should happen next? (observe, investigate, restart, escalate)
-- **Human review**: should a person look at this? (yes, no)
-- **Probable cause**: what is the likely cause? This is scored separately and is not part of pass/fail.
+- Severity: how bad is it? (normal, degraded, high, critical)
+- Action: what should happen next? (observe, investigate, restart, escalate)
+- Human review: should a person look at this? (yes, no)
+- Probable cause: what is the likely cause? This is scored separately and is not part of pass/fail.
 
 There are 7 kinds of situation (scenarios), 10 runs of each. Each engine saw exactly the same data (same seed, 1000) and never saw the scenario name or the expected answer. We wrote the expected answers by hand before the run.
 
-A run **passes** only if severity, action and human review are all right.
+A run passes only if severity, action and human review are all right.
 
 | Engine | What it is | How we called it |
 |---|---|---|
@@ -26,7 +26,7 @@ A run **passes** only if severity, action and human review are all right.
 
 | | Jev | Sonnet | Opus | qwen3:8b |
 |---|---|---|---|---|
-| **Runs passed** | **37/70 (53%)** | 29/70 (41%) | 34/70 (49%) | 30/70 (43%) |
+| Runs passed | 37/70 (53%) | 29/70 (41%) | 34/70 (49%) | 30/70 (43%) |
 | Likely range (95%) | 41–64% | 31–53% | 37–60% | 32–55% |
 | Severity right | 90% | 61% | 93% | 57% |
 | Action right | 80% | 80% | 89% | 89% |
@@ -53,20 +53,20 @@ Every engine answered all 70 runs. There were no invalid answers and no failed c
 
 ## What this means
 
-1. **No engine is clearly better.** All four get roughly half the runs fully right, and their likely ranges overlap. 70 runs are not enough to rank them.
-2. **Severity and action are mostly right. Human review is what fails.** If we ignore human review, Opus is right on 59 of 70 runs and Jev on 53. For Opus, 25 failed runs were wrong *only* on human review; for Jev, 16.
-3. **The engines lean in different directions on human review.** Jev and qwen ask for a person too often (Jev: 21 unneeded "yes"). Sonnet skips the person when one is needed (27 missed "yes"). Opus errs both ways.
-4. **Clear cases are easy, the middle is hard.** Healthy and critical situations are close to 100% for everyone. In the in-between scenarios each engine has its own blind spots: Jev is the only one that reliably catches errors that show up only in the logs, but it never gets the hung worker right; Opus is the reverse.
-5. **Jev is about 10 times faster** than the next engine.
+1. No engine is clearly better. All four get roughly half the runs fully right, and their likely ranges overlap. 70 runs are not enough to rank them.
+2. Severity and action are mostly right. Human review is what fails. If we ignore human review, Opus is right on 59 of 70 runs and Jev on 53. For Opus, 25 failed runs were wrong only on human review. For Jev, 16 runs were wrong only on human review.
+3. The engines lean in different directions on human review. Jev and qwen ask for a person too often (Jev: 21 unneeded "yes"). Sonnet skips the person when one is needed (27 missed "yes"). Opus errs both ways.
+4. Clear cases are easy, the middle is hard. Healthy and critical situations are close to 100% for everyone. In the in-between scenarios each engine has its own blind spots: Jev is the only one that reliably catches errors that show up only in the logs, but it never gets the hung worker right. Opus is the reverse.
+5. Jev is about 10 times faster than the next engine.
 
 ## Read with care
 
-- **The data is synthetic.** Real telemetry may behave differently. Tier 2 will test that.
-- **We wrote the expected answers ourselves.** In the "degraded" scenario, Opus and most of Jev's runs answer "high, investigate, yes", while we expect "no" human review. When several engines agree against our answer, that rule deserves a second look. Changing it would change the experiment, so it needs a decision first.
-- **10 runs per scenario are not 10 independent cases.** They are variations of the same situation. Read scenario scores as a direction, not a precise rate.
-- **Claude ran through the `claude -p` tool, not the Anthropic API.** Its times include the tool's start-up time.
-- **qwen3 "thinks" before it answers** (Ollama's default for this model). It wrote up to about 12,700 characters of reasoning per answer. Ollama does not count these in the output tokens, so qwen's token count (37 per answer) is far too low, and the thinking explains its slow times.
-- **Only Jev reports how confident it is**, so confidence was not compared.
+- The data is synthetic. Real telemetry may behave differently. Tier 2 will test that.
+- We wrote the expected answers ourselves. In the "degraded" scenario, Opus and most of Jev's runs answer "high, investigate, yes", while we expect "no" human review. When several engines agree against our answer, that rule deserves a second look. Changing it would change the experiment, so it needs a decision first.
+- 10 runs per scenario are not 10 independent cases. They are variations of the same situation. Read scenario scores as a direction, not a precise rate.
+- Claude ran through the `claude -p` tool, not the Anthropic API. Its times include the tool's start-up time.
+- qwen3 "thinks" before it answers (Ollama's default for this model). It wrote up to about 12,700 characters of reasoning per answer. Ollama does not count these in the output tokens, so qwen's token count (37 per answer) is far too low, and the thinking explains its slow times.
+- Only Jev reports how confident it is, so confidence was not compared.
 
 ## Test machine (for the local qwen3:8b run)
 
@@ -83,7 +83,7 @@ Jev and Claude ran on their providers' servers, so only their network round trip
 | GPU use | all 37 layers on the GPU (from the Ollama log) |
 | Settings | temperature 0, seed = run seed, JSON schema output |
 
-All four batches started at the same time. The Jev and Claude batches finished within about 7 minutes; qwen ran for 25 minutes and had the machine to itself for most of that. Other unrelated work was running on the laptop during the run.
+All four batches started at the same time. The Jev and Claude batches finished within about 7 minutes. qwen ran for 25 minutes and had the machine to itself for most of that. Other unrelated work was running on the laptop during the run.
 
 ## Source and how to repeat
 

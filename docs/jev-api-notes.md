@@ -2,7 +2,7 @@
 
 Consulted: 2026-09-29, corrected 2026-10-05. Primary source: TypeSafe's API reference, https://docs.typesafe.ai/api. Jev is TypeSafe's model. Cross-checked against the Pydantic AI TypeSafe page (https://pydantic.dev/docs/ai/models/typesafe/), which agrees on model names, `TYPESAFE_API_KEY`, and the choice/rubric/boolean question types.
 
-Correction (2026-10-05): the first version of these notes used https://thejevai.com/docs as the primary source. That site is not TypeSafe. Its footer says "Jev AI is an independently operated product and is not affiliated with, operated by, or endorsed by TypeSafe." A key from the TypeSafe console (`apikey_` prefix) gets `401 {"code":-1,"message":"Invalid API key."}` on `https://thejevai.com/v1/systemone` and works on `https://api.typesafe.ai/v1/systemone` (a fake key gets 401 there; the real key gets 200 with answers, model `jev-1.13.0`). The request and response shapes below matched in real runs on 2026-10-05. Details first taken from thejevai.com and not yet re-checked against docs.typesafe.ai are marked.
+Correction (2026-10-05): the first version of these notes used https://thejevai.com/docs as the primary source. That site is not TypeSafe. Its footer says "Jev AI is an independently operated product and is not affiliated with, operated by, or endorsed by TypeSafe." A key from the TypeSafe console (`apikey_` prefix) gets `401 {"code":-1,"message":"Invalid API key."}` on `https://thejevai.com/v1/systemone` and works on `https://api.typesafe.ai/v1/systemone` (a fake key gets 401 there, and the real key gets 200 with answers, model `jev-1.13.0`). The request and response shapes below matched in real runs on 2026-10-05. Details first taken from thejevai.com and not yet re-checked against docs.typesafe.ai are marked.
 
 Not used: other sites found by search (blog posts, community sites, unofficial GitHub notes). One of them (jevai.org) describes a different endpoint (`/v1/decisions`) and was ignored.
 
@@ -37,7 +37,7 @@ Question types:
 }
 ```
 
-- `noul` answers: `{"type": "noul", "noul": 0.95}`. The number is the probability of "yes". There is **no separate confidence field** for noul.
+- `noul` answers: `{"type": "noul", "noul": 0.95}`. The number is the probability of "yes". There is no separate confidence field for noul.
 - `score` answers: `score`, `legend`, `probabilities`, `confidence`.
 
 ## Usage, timing and cost
@@ -94,7 +94,7 @@ Tier 2 reuses the same endpoint and question types through `JevClient.send` (tra
 - State key is `observations` (Tier 1 uses `server_observations`). The API takes an arbitrary `state` object.
 - Overall confidence is the mean of the three choice confidences when present, else `null`. The noul probability is stored separately in the raw response.
 - Jev's reply has no free-text reasoning field in the docs checked, so `reasoning` is `null` unless a `reasoning` string appears in the body. The raw response is always stored.
-- **Size.** The 32k-token limit above comes from the Pydantic AI page, not from the Jev API docs, so it is unverified for this endpoint. A real observation can be large, so the builder caps it at 60,000 bytes (about 15k tokens at roughly 4 bytes per token) before the questions are added. If real runs show Jev rejecting requests, lower `BYTE_BUDGET` in `tier2/observation.py` and record the finding.
+- Size: the 32k-token limit above comes from the Pydantic AI page, not from the Jev API docs, so it is unverified for this endpoint. A real observation can be large, so the builder caps it at 60,000 bytes (about 15k tokens at roughly 4 bytes per token) before the questions are added. If real runs show Jev rejecting requests, lower `BYTE_BUDGET` in `tier2/observation.py` and record the finding.
 
 ## Tier 3 use (Kubernetes faults on kind)
 
@@ -102,7 +102,7 @@ Same endpoint and question types through `JevClient.send` and `tier3/jev_adapter
 
 | Question | Type | Notes |
 |---|---|---|
-| `incident_detected` | `noul` | P(yes); incident if >= 0.5, as in Tier 2. |
+| `incident_detected` | `noul` | P(yes). Incident if >= 0.5, as in Tier 2. |
 | `affected_component` | `choice` | 20 options: `none`, the 15 demo services deployed in Tier 3, the four kind node names. |
 | `diagnosis` | `choice` | 12 options (`tier3/vocab.py`). |
 | `recommended_action` | `choice` | 6 options, as in Tier 2. |
