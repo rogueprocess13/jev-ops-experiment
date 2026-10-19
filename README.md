@@ -517,9 +517,11 @@ No Python needed on your machine:
 ```bash
 docker build -t jev-ops-experiment .
 cp .env.example .env      # then set JEV_API_KEY
-docker run --rm --env-file .env -v "$PWD/results:/app/results" jev-ops-experiment --runs 7
-docker run --rm -v "$PWD/results:/app/results" --entrypoint python jev-ops-experiment report.py
+docker run --rm --user "$(id -u):$(id -g)" --env-file .env -v "$PWD/results:/app/results" jev-ops-experiment --runs 7
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/results:/app/results" --entrypoint python jev-ops-experiment report.py
 ```
+
+`--user` makes the result files yours; without it they are owned by root.
 
 The image contains no credentials; `.env` is excluded from the build. Pass them at run time with `--env-file` or `-e JEV_API_KEY=...`.
 

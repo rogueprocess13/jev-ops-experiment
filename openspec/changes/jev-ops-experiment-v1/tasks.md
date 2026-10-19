@@ -66,7 +66,7 @@
 - [x] 9.1 Write README: plain-language description, experimental-benchmark disclaimer, prerequisites, Python version, install, Jev config and env vars, single run, batch, seed reproduction, results storage
 - [x] 9.2 Document the seed/non-determinism caveat and the rationale for ambiguous/contradictory expectations
 - [x] 9.3 Add minimal `Dockerfile` (slim Python, `ENTRYPOINT ["python", "run.py"]`, no baked credentials, add `.dockerignore` excluding `.env` and `results/`)
-- [ ] 9.4 Build and run the image once with env vars and a mounted results directory
+- [x] 9.4 Build and run the image once with env vars and a mounted results directory (2026-10-19: `--runs 7` against real Jev, 7/7 HTTP 200, report from the image; no `.env` in the image, no key in the results; README now passes `--user` so result files are not root-owned)
 
 ## 10. Application logs
 
