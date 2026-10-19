@@ -482,7 +482,7 @@ Notes on the testbed, the verified facts and every dropped scenario are in `docs
 
 ## Tier 4: closed-loop remediation on kind
 
-> Status: the first full live Jev batch (40 runs) is written up in [docs/results-2026-10-19-tier4-jev.md](docs/results-2026-10-19-tier4-jev.md). The Claude Opus baseline on the same path is task group 7 in `openspec/changes/k8s-remediation-tier4/tasks.md`.
+> Status: the first full live Jev batch (40 runs) is written up in [docs/results-2026-10-19-tier4-jev.md](docs/results-2026-10-19-tier4-jev.md), and the Claude Opus baseline on the same path (40 runs, through the `claude` CLI) in [docs/results-2026-10-19-tier4-jev-vs-opus.md](docs/results-2026-10-19-tier4-jev-vs-opus.md). Recovered by the single action: Jev 4/18 incident runs, Opus 13/18.
 
 Tier 3 reports remediation executed, MTTR and recovery verified as "not measured", because it never acts. Tier 4 runs the same scenarios (`K000` to `K010`) on the same cluster, and after the first poll that reports an incident it carries out Jev's recommended action on Jev's named component, once. Then it watches whether the system recovers. This is the only tier that acts on an engine's recommendation.
 

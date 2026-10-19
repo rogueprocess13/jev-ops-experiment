@@ -44,7 +44,7 @@
 - [x] 6.1 Run each scenario once with Jev through Tier 4; read each request by hand for leaks, and check every action's record and restore (2026-10-18: `results/tier4/20261018-210528-2703` K000, `20261018-212756-f595` K001-K010; a session reset killed the first pass after K000)
 - [x] 6.2 Batch `K001` to `K010` with `--repeats 3`, plus at least 10 `K000` runs (2026-10-19: `results/tier4/20261018-232405-5ada`, `20261019-050044-6cc4`; 40/40 ok)
 - [x] 6.3 Print the scorecard and the LF Edge export (`results/tier4/6.2-combined-scorecard.md`, `6.2-combined-lfedge.jsonl`)
-- [x] 6.4 Write `docs/results-<date>-tier4-jev.md` from the run records only, stating what is not comparable with the group's agents; stop the cluster (`docs/results-2026-10-19-tier4-jev.md`; the cluster stays up for 7.5 and is stopped after it)
+- [x] 6.4 Write `docs/results-<date>-tier4-jev.md` from the run records only, stating what is not comparable with the group's agents; stop the cluster (`docs/results-2026-10-19-tier4-jev.md`; cluster stopped 2026-10-19 after 7.5)
 
 ## 7. Opus baseline engine, same interface (after group 6)
 
@@ -52,5 +52,5 @@
 - [x] 7.2 `tier3/claude_engine.py` (an `AIOpsEngine`): the same observation and the same four questions to `claude-opus-5-5` through the Anthropic API, structured output restricted to the same answer sets, strict parsing (out-of-set is `invalid`), tokens and cost from `CLAUDE_OPUS_PRICE_*` only, `n/a` otherwise; reuse `llm/claude.py` settings (temperature, effort) where they fit
 - [x] 7.3 Tests: the prompt carries no scenario, fault name, expected answer or harness term (the Tier 3/4 whole-path leak tests run with this engine's request builder); parsing of valid, out-of-set and missing answers; no API call in tests
 - [x] 7.4 `--engine jev|claude-opus` on `python -m tier3` and `python -m tier4` (`run`, `batch`), recorded in every run record and in the LF Edge export's `approach`
-- [ ] 7.5 Live: Tier 4 batch with `--engine claude-opus` on the same scenarios and repeats as 6.2 (`K001`-`K010` x3, `K000` x10)
-- [ ] 7.6 Write the comparison from the run records only: Jev vs Opus on detect, RCA, action, single-shot MTTR and verified MTTR, recovered by action, false-alarm actions, cost; label every MTTR "single-shot recommendation MTTR"
+- [x] 7.5 Live: Tier 4 batch with `--engine claude-opus` on the same scenarios and repeats as 6.2 (`K001`-`K010` x3, `K000` x10) (2026-10-19: `results/tier4/20261019-070552-2d0e`, `20261019-122929-7076`; 40/40 ok, transport `claude-cli`; `7.5-combined-scorecard.md`, `7.5-combined-lfedge.jsonl`)
+- [x] 7.6 Write the comparison from the run records only: Jev vs Opus on detect, RCA, action, single-shot MTTR and verified MTTR, recovered by action, false-alarm actions, cost; label every MTTR "single-shot recommendation MTTR" (`docs/results-2026-10-19-tier4-jev-vs-opus.md`)
