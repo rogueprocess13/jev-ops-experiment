@@ -31,6 +31,32 @@ Every tier has been run live against real Jev, on the dates in the write-ups bel
 | 3 | [Jev, 30 fault runs and 10 healthy controls](docs/results-2026-10-18-tier3-jev.md) |
 | 4 | [Jev, 40 runs](docs/results-2026-10-19-tier4-jev.md); [Jev vs Claude Opus](docs/results-2026-10-19-tier4-jev-vs-opus.md) (fixed by the single action: Jev 4/18 incident runs, Opus 13/18) |
 
+## How Tiers 3 and 4 compare with the LF Edge AIOps harness
+
+Tiers 3 and 4 follow the [LF Edge AIOps group's](https://github.com/lfedgeai/AIOps) Kubernetes experiments (`research/agentic_aiops_architectures`), but they are not the same harness. Read our figures next to the group's only with the differences below in mind. Tiers 1 and 2 do not use the group's faults and cannot be compared with their results at all.
+
+**The same as the group's harness:**
+
+- The ten Kubernetes fault types, with their names, injected through the Kubernetes API into the OpenTelemetry Demo, with `cart` as the target.
+- Polling every 15 s, with the first poll 15 s after the fault.
+- The scorecard terms: detect, RCA, remediation correct, MTTD, and `mttr_seconds` (fault to remediation written). `export-lfedge` writes records in the group's JSONL shape.
+
+**Different, and how it affects the results:**
+
+| | LF Edge harness | This repo | Effect on the results |
+|---|---|---|---|
+| The agent | A tool-calling loop. It gathers its own evidence, writes its own fix and can retry. | The engine answers four fixed questions about an observation the harness builds. Tier 4 carries out one action, once, from a three-action allowlist (`scale_up`, `restart_service`, `rollback_change`). | Our engines cannot look for more evidence, choose a fix outside the allowlist or try again. Recovery rates measure one answer, not an agent at work. |
+| Verified MTTR (`mttr_verified_seconds`) | The injected target's spec and readiness pass, checked per fault type, with no hold. Not measured for `kill_pod`, `pvc_full` or `node_taint`. | Every service-level check passes (all Deployments, pods and services back to baseline), held for at least 60 s, to the end of a 360 s watch. | Ours is stricter and longer. Do not compare verified MTTR or recovery figures directly. |
+| Healthy control | A skip-injection mode exists, but false alarms are not scored. | `K000`, with every poll scored. Actions taken on false alarms are recorded. | We report false alarms that the group's figures do not include. |
+| Faults with no incident | Possibly scored as incidents (we have not checked). | `K002`, `K004`, `K006` and `K010` heal on their own or show no effect on this cluster, so we expect "no incident". | Detection and false-alarm counts on these four faults may mean different things in the two harnesses. |
+
+Our runs used one laptop, one kind cluster, one demo version, one load level and three runs per fault, so read them as a direction, not as rates. The fair comparisons are detect, RCA, MTTD and `mttr_seconds` read as "time to first action", and each needs the note that our engines did not gather their own evidence. In addition:
+
+- Claude Opus ran only on Tier 4, and through the `claude` CLI rather than the API, so its latency and cost include the CLI's overhead. Tier 3 has Jev results only.
+- Tier 2 uses flagd feature-flag faults in Docker Compose, not the group's faults.
+
+Each tier's section below and each write-up has the detail.
+
 ## Quick start
 
 You need Python 3.10 or newer and git. Linux and macOS work as shown. On Windows, use WSL or see [Manual setup](#manual-setup).
@@ -515,6 +541,16 @@ Recovered means every Deployment is back at baseline availability with its rollo
 **This is single-shot recommendation MTTR**: one answer, carried out once, no feedback or retry. It is not operational MTTR, where an engineer or agent investigates, tries, checks and retries. A Claude Opus engine answering the same four questions through the same path is the like-for-like baseline: add `--engine claude-opus` to `python -m tier4 run`/`batch` (or the wrapper scripts). It uses the Anthropic API when `ANTHROPIC_API_KEY` is set, else the `claude` CLI, as in Tier 1. Every record and the LF Edge `approach` field say which engine answered.
 
 MTTR, as the LF Edge harness defines it (`run_harness.py`, read 2026-10-18): `mttr_seconds` is fault to remediation written. `mttr_verified_seconds` is fault to recovery verified, for recovered-by-action runs only. Our recovery check is service-level and must hold for 60 s. Theirs checks the injected target's spec and readiness per fault type, with no hold, and cannot verify `kill_pod`, `pvc_full` or `node_taint`. Their agents choose and write their own fixes. Ours are Jev's four answers, which the harness carries out.
+
+| | LF Edge harness | Tier 4 |
+|---|---|---|
+| Faults | ten Kubernetes API faults | the same ten, same names, exact restore |
+| Agent | tool-calling loop that gathers evidence, writes its own fix and can retry | the engine answers four fixed questions; the harness carries out the action once, from a three-operation allowlist |
+| `mttr_seconds` | fault to remediation written | the same |
+| `mttr_verified_seconds` | fault to the injected target's spec and readiness check passing, per fault type, no hold; never for `kill_pod`, `pvc_full`, `node_taint` | fault to the start of the final run of service-level checks, held for at least 60 s to the end of a 360 s watch |
+| Healthy control | skip-injection mode, false alarms not scored | `K000`, every poll scored; actions on false alarms recorded |
+
+Compare `mttr_seconds` only as "time to first action". Our verified MTTR is stricter than theirs and is single-shot.
 
 ```bash
 ./setup-k8s.sh && ./health-check-k8s.sh   # the Tier 3 cluster
