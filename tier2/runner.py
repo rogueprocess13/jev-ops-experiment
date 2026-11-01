@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from prompts.loader import engine_prompt
 from tier2.engine import Decision
 from tier2.evaluate import evaluate, is_false_positive, timing
 from tier2.manifest import any_deviation
@@ -66,6 +67,7 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
                          "diagnosis": scn.expected.diagnosis,
                          "acceptable_actions": list(scn.expected.acceptable_actions)},
         "status": STATUS_OK, "message": "", "versions": cfg.versions, "git_commit": cfg.git_commit,
+        "prompt": engine_prompt(deps.engine),
     }
     injected = False
     base_stats: dict[str, ServiceStats] = {}
@@ -196,6 +198,7 @@ def run_batch(scenarios: list[Scenario], deps: Deps, cfg: Config, results_dir: P
         if stopped:
             break
     summary = {"run_id": run_id, "repeats": repeats, "stopped_early": stopped,
+               "prompt": engine_prompt(deps.engine),
                "aggregate": aggregate(records),
                "runs": [{"experiment_id": r["experiment_id"], "status": r["status"],
                          "evaluation": r["evaluation"]} for r in records]}

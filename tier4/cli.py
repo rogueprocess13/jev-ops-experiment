@@ -8,17 +8,17 @@ import sys
 from pathlib import Path
 
 from tier3 import testbed
-from tier3.cli import ENGINES, _write, build_deps, make_config, print_record
+from tier3.cli import ENGINES, _write, add_prompt_arg, build_deps, make_config, print_record, resolve_prompt
 from tier3.scenarios import ScenarioError, format_list, get_scenario, load_all
 from tier4.runner import DEFAULT_RESULTS
 
 
-def build_tier4_deps(engine: str = "jev"):
+def build_tier4_deps(engine: str = "jev", prompt=None):
     from tier3.collectors.kube import Kube
     from tier4.executor import Executor, kubectl_undo
     from tier4.runner import Tier4Deps
 
-    base = build_deps(engine)
+    base = build_deps(engine, prompt)
     kube = Kube.from_kubeconfig(testbed.kubeconfig(), testbed.namespace())
     undo = kubectl_undo(testbed.kubeconfig(), testbed.namespace())
     return Tier4Deps(base=base, executor=lambda: Executor(kube, undo=undo))
@@ -68,6 +68,7 @@ def main(argv=None) -> int:
     for p in (r, b):
         p.add_argument("--results-dir", default=str(DEFAULT_RESULTS))
         p.add_argument("--engine", choices=ENGINES, default="jev")
+        add_prompt_arg(p)
     for name, hlp in (("scorecard", "print the scorecard for a results directory"),
                       ("export-lfedge", "write JSONL in the LF Edge harness's field names")):
         p = sub.add_parser(name, help=hlp)
@@ -75,6 +76,7 @@ def main(argv=None) -> int:
         if name != "scorecard":
             p.add_argument("-o", "--output")
     args = ap.parse_args(argv)
+    resolve_prompt(ap, args)
 
     if args.cmd == "list":
         print(format_list())
@@ -114,7 +116,7 @@ def main(argv=None) -> int:
     except ScenarioError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    deps, cfg = build_tier4_deps(args.engine), make_config("poll")
+    deps, cfg = build_tier4_deps(args.engine, args.prompt_variant), make_config("poll")
     if args.cmd == "run":
         rec = run_experiment(scns[0], deps, cfg, new_run_id(), Path(args.results_dir))
         print_record(rec)

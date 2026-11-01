@@ -6,13 +6,14 @@ import json
 import sys
 from pathlib import Path
 
+from prompts.loader import DEFAULT_VARIANT, VariantError, list_variants
 from tier2 import testbed
 from tier2.scenarios import ScenarioError, format_list, get_scenario, load_all
 
 DEFAULT_RESULTS = Path("results") / "tier2"
 
 
-def build_deps():
+def build_deps(prompt=None):
     from tier2.collect import collect
     from tier2.collectors.jaeger import Jaeger
     from tier2.collectors.opensearch import OpenSearch
@@ -23,7 +24,7 @@ def build_deps():
     from tier2.workload import Workload
 
     try:
-        engine = JevAdapter()
+        engine = JevAdapter(prompt=prompt)
     except ConfigError as e:
         raise SystemExit(f"error: {e}")
     store = HttpFlagStore(testbed.base_url())
@@ -71,7 +72,17 @@ def main(argv=None) -> int:
     a.add_argument("--repeats", type=int, default=1)
     for p in (r, a):
         p.add_argument("--results-dir", default=str(DEFAULT_RESULTS))
+        p.add_argument("--prompt", default=DEFAULT_VARIANT,
+                       help=f"prompt variant (prompts/tier2/*.yaml): {', '.join(list_variants('tier2'))} "
+                            f"(default {DEFAULT_VARIANT})")
     args = ap.parse_args(argv)
+    prompt = None
+    if getattr(args, "prompt", None) is not None:
+        from tier2.jev_adapter import load_prompt
+        try:
+            prompt = load_prompt(args.prompt)  # before any run: an unknown name injects nothing
+        except VariantError as e:
+            ap.error(str(e))
 
     if args.cmd == "list":
         print(format_list())
@@ -93,7 +104,7 @@ def main(argv=None) -> int:
     except ScenarioError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    deps, cfg = build_deps(), make_config()
+    deps, cfg = build_deps(prompt), make_config()
     if args.cmd == "run":
         rec = run_experiment(scns[0], deps, cfg, new_run_id(), Path(args.results_dir))
         print_record(rec)

@@ -69,14 +69,15 @@ def parse_answers(body: object) -> Decision:
 class JevAdapter:
     """AIOpsEngine backed by JevClient. All Jev-specific handling stays here."""
 
-    def __init__(self, client=None):
+    def __init__(self, client=None, prompt: Variant | None = None):
         if client is None:
             from jev.client import JevClient
             client = JevClient()
         self.client = client
+        self.prompt = prompt or load_prompt()
 
     def build_request(self, observation: dict) -> dict:
-        return self.client.build_request(observation, questions=QUESTIONS,
+        return self.client.build_request(observation, questions=self.prompt.questions,
                                          state_key="observations")
 
     def decide(self, observation: dict) -> Decision:

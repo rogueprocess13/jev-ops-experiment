@@ -12,11 +12,11 @@
 
 ## 3. Selecting and recording a variant
 
-- [ ] 3.1 `--prompt` on `run.py`, `python -m tier2`, `python -m tier3` and `python -m tier4` (`run`, `batch`), defaulting to `baseline`. An unknown name exits before any run and lists the variants
-- [ ] 3.2 Pass the built questions through the engines: the Jev adapters (`build_request(questions=...)`), `llm/prompt.py`, `llm/claude.py`, `llm/ollama.py` and `tier3/claude_engine.py` take the question dict instead of importing the constant (D4)
-- [ ] 3.3 Add `prompt: {name, version, sha256}` to Tier 1 JSONL lines and summaries, and to Tier 2, 3 and 4 records and summaries. Readers treat a missing field as `baseline` v1 and say so
-- [ ] 3.4 Parametrise the existing leak tests over every variant file, and add the variant-text term check (D9)
-- [ ] 3.5 Offline tests: `--prompt` reaches every engine's request or prompt; the record field; the unknown-variant exit; isolation tests still pass (the adapters are still the only `jev.client` importers)
+- [x] 3.1 `--prompt` on `run.py`, `python -m tier2`, `python -m tier3` and `python -m tier4` (`run`, `batch`), defaulting to `baseline`. An unknown name exits before any run and lists the variants
+- [x] 3.2 Pass the built questions through the engines: the Jev adapters (`build_request(questions=...)`), `llm/prompt.py`, `llm/claude.py`, `llm/ollama.py` and `tier3/claude_engine.py` take the question dict instead of importing the constant (D4) (the helpers in `llm/prompt.py` and `tier3/claude_engine.py` keep the baseline as a default argument; every engine passes `self.prompt.questions`)
+- [x] 3.3 Add `prompt: {name, version, sha256}` to Tier 1 JSONL lines and summaries, and to Tier 2, 3 and 4 records and summaries. Readers treat a missing field as `baseline` v1 and say so (`prompts.loader.record_prompt`; the reports use it in task 5. A non-baseline Tier 1 file name gets `-prompt-<name>`)
+- [x] 3.4 Parametrise the existing leak tests over every variant file, and add the variant-text term check (D9)
+- [x] 3.5 Offline tests: `--prompt` reaches every engine's request or prompt; the record field; the unknown-variant exit; isolation tests still pass (the adapters are still the only `jev.client` importers)
 
 ## 4. Replay
 

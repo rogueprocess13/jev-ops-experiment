@@ -185,6 +185,25 @@ def load_variant(tier: str, name: str, schema: dict[str, QuestionSpec]) -> Varia
                    sha256=questions_hash(questions), path=str(path))
 
 
+def engine_prompt(engine) -> dict | None:
+    """The identity of the variant an engine asks, for its run record. None for an
+    engine without one (test fakes); readers then treat the record as baseline."""
+    v = getattr(engine, "prompt", None)
+    return v.identity if isinstance(v, Variant) else None
+
+
+ASSUMED_NOTE = "no prompt field: read as baseline"
+
+
+def record_prompt(record: dict) -> tuple[dict, bool]:
+    """(prompt identity, assumed) for a run record. Records written before variants
+    existed have no `prompt` field and are read as baseline version 1, sha256 unknown."""
+    p = record.get("prompt")
+    if isinstance(p, dict) and p.get("name"):
+        return {"name": p["name"], "version": p.get("version"), "sha256": p.get("sha256")}, False
+    return {"name": DEFAULT_VARIANT, "version": 1, "sha256": None}, True
+
+
 def all_variant_text(variant: Variant) -> str:
     """Every string a variant sends to an engine, for the leak checks."""
     parts = []

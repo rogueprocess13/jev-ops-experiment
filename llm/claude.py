@@ -14,6 +14,7 @@ import time
 from typing import Callable
 
 from jev.client import STATUS_ERROR, STATUS_INVALID, Decision
+from jev.client import load_prompt
 from llm.prompt import SYSTEM_PROMPT, build_prompt, build_schema, parse_answer
 
 MODELS = {"claude-sonnet": "claude-sonnet-5-5", "claude-opus": "claude-opus-5-5"}
@@ -51,7 +52,7 @@ class ClaudeAPIEngine:
 
     def __init__(self, name: str, effort: str = "medium", client=None,
                  prices: tuple[float | None, float | None] = (None, None),
-                 sleep: Callable[[float], None] = time.sleep):
+                 sleep: Callable[[float], None] = time.sleep, prompt=None):
         import anthropic
 
         self._anthropic = anthropic
@@ -60,15 +61,17 @@ class ClaudeAPIEngine:
         self.prices = prices
         self._client = client or anthropic.Anthropic(max_retries=0, timeout=TIMEOUT_S)
         self._sleep = sleep
+        self.prompt = prompt or load_prompt()
         self.info = {"name": name, "transport": "anthropic-api", "model_requested": self.model,
                      "effort": effort}
 
     def decide(self, observations: dict) -> Decision:
         a = self._anthropic
-        prompt = build_prompt(observations)
+        prompt = build_prompt(observations, self.prompt.questions)
         kwargs = dict(model=self.model, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT,
                       messages=[{"role": "user", "content": prompt}],
-                      output_config={"format": {"type": "json_schema", "schema": build_schema()},
+                      output_config={"format": {"type": "json_schema",
+                                                "schema": build_schema(self.prompt.questions)},
                                      "effort": self.effort})
         started = time.perf_counter()
         attempts, last, status = 0, "no attempt made", None
@@ -105,7 +108,7 @@ class ClaudeAPIEngine:
             d = Decision(status=STATUS_INVALID, raw_response=raw, message="reply cut off at max_tokens")
         else:
             text = next((b.text for b in resp.content if b.type == "text"), None)
-            d = parse_answer(text, raw=raw) if text is not None else Decision(
+            d = parse_answer(text, raw=raw, questions=self.prompt.questions) if text is not None else Decision(
                 status=STATUS_INVALID, raw_response=raw, message="reply has no text block")
             d.raw_response = raw
         usage = raw.get("usage") or {}
@@ -141,18 +144,20 @@ class ClaudeCLIEngine:
 
     def __init__(self, name: str, effort: str = "medium", claude: str = "claude",
                  runner=_run, prices: tuple[float | None, float | None] = (None, None),
-                 cli_version: str | None = None):
+                 cli_version: str | None = None, prompt=None):
         self.model = MODELS[name]
         self.effort = effort
         self.claude = claude
         self.prices = prices
         self._run = runner
+        self.prompt = prompt or load_prompt()
         self.info = {"name": name, "transport": "claude-cli", "model_requested": self.model,
                      "effort": effort, "cli_version": cli_version}
 
     def command(self) -> list[str]:
         return [self.claude, "-p", "--model", self.model, "--output-format", "json",
-                "--json-schema", json.dumps(build_schema()), "--system-prompt", SYSTEM_PROMPT,
+                "--json-schema", json.dumps(build_schema(self.prompt.questions)),
+                "--system-prompt", SYSTEM_PROMPT,
                 "--tools", "", "--effort", self.effort, "--no-session-persistence",
                 "--strict-mcp-config", "--setting-sources", ""]
 
@@ -163,7 +168,7 @@ class ClaudeCLIEngine:
                 if k != "CLAUDECODE" and not k.startswith("CLAUDE_CODE_")}
 
     def decide(self, observations: dict) -> Decision:
-        prompt = build_prompt(observations)
+        prompt = build_prompt(observations, self.prompt.questions)
         started = time.perf_counter()
         with tempfile.TemporaryDirectory(prefix="llm-baseline-") as cwd:
             try:
@@ -187,7 +192,8 @@ class ClaudeCLIEngine:
             return self._finish(Decision(status=STATUS_ERROR, message=f"claude CLI error: {msg}"),
                                 prompt, started)
         answer = body.get("structured_output")
-        d = parse_answer(answer if isinstance(answer, dict) else body.get("result"), raw=body)
+        d = parse_answer(answer if isinstance(answer, dict) else body.get("result"), raw=body,
+                         questions=self.prompt.questions)
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
         d.usage = usage
         d.input_tokens = total_input_tokens(usage)

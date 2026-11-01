@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from prompts.loader import engine_prompt
 from tier3.engine import STATUS_OK as DECISION_OK
 from tier3.evaluate import seconds_between
 from tier3.runner import STATUS_CONTAMINATED, Config, Deps, new_run_id
@@ -128,6 +129,7 @@ def run_batch(scenarios: list[Scenario], deps: Tier4Deps, cfg: Config, results_d
         if stopped:
             break
     summary = {"run_id": run_id, "mode": cfg.mode, "repeats": repeats, "stopped_early": stopped,
+               "prompt": engine_prompt(deps.base.engine),
                "scorecard": scorecard_data(records),
                "runs": [{"experiment_id": r["experiment_id"], "status": r["status"],
                          "evaluation": r["evaluation"],

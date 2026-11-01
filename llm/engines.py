@@ -64,20 +64,22 @@ def _cli_version(claude: str) -> str | None:
         return None
 
 
-def build_engine(name: str, *, which=shutil.which, err=sys.stderr):
-    """Build the engine for a validated name. Raises ConfigError before any call."""
+def build_engine(name: str, *, which=shutil.which, err=sys.stderr, prompt=None):
+    """Build the engine for a validated name, asking the given prompt variant (the
+    Tier 1 baseline if None). Raises ConfigError before any call."""
     _load_dotenv()
     if name == "jev":
-        return JevClient()
+        return JevClient(prompt=prompt)
     if name.startswith("ollama:"):
-        return OllamaEngine(name[len("ollama:"):], url=os.environ.get("OLLAMA_URL", OLLAMA_DEFAULT_URL))
+        return OllamaEngine(name[len("ollama:"):], url=os.environ.get("OLLAMA_URL", OLLAMA_DEFAULT_URL),
+                            prompt=prompt)
 
     effort = os.environ.get("LLM_EFFORT", "medium").strip() or "medium"
     if effort not in EFFORTS:
         raise ConfigError(f"LLM_EFFORT must be one of {', '.join(EFFORTS)}, got {effort!r}")
     prices = _prices(name)
     if os.environ.get("ANTHROPIC_API_KEY", "").strip():
-        return ClaudeAPIEngine(name, effort=effort, prices=prices)
+        return ClaudeAPIEngine(name, effort=effort, prices=prices, prompt=prompt)
 
     claude = which("claude")
     if not claude:
@@ -88,6 +90,6 @@ def build_engine(name: str, *, which=shutil.which, err=sys.stderr):
     bar = "*" * 78
     print(f"\n{bar}\n*** {notice}\n{bar}\n", file=err)
     engine = ClaudeCLIEngine(name, effort=effort, claude=claude, prices=prices,
-                             cli_version=_cli_version(claude))
+                             cli_version=_cli_version(claude), prompt=prompt)
     engine.info["notice"] = notice
     return engine

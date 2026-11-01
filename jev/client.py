@@ -230,18 +230,19 @@ class Reply:
 
 class JevClient:
     def __init__(self, config: JevConfig | None = None, post: PostFn = _default_post,
-                 sleep: Callable[[float], None] = time.sleep):
+                 sleep: Callable[[float], None] = time.sleep, prompt: Variant | None = None):
         self.config = config or load_config()
+        self.prompt = prompt or load_prompt()  # Tier 1 wording; Tier 2/3 adapters pass their own questions
         self._post = post
         self._sleep = sleep
 
     def build_request(self, observations: dict, questions: dict | None = None,
                       state_key: str = "server_observations") -> dict:
-        """Tier 1 defaults give the original request; Tier 2 passes its own questions."""
+        """Tier 1 defaults ask this client's prompt variant; Tier 2 and 3 pass their own questions."""
         return {
             "state": {state_key: observations},
             "model": self.config.model,
-            "questions": QUESTIONS if questions is None else questions,
+            "questions": self.prompt.questions if questions is None else questions,
         }
 
     def send(self, payload: dict) -> Reply:

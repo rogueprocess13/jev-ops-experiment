@@ -124,7 +124,7 @@ def test_tier1_request_unchanged_by_questions_arg():
     from jev.client import QUESTIONS as T1
     c = JevClient(JevConfig(api_key="k"), post=lambda *a: None)
     req = c.build_request({"cpu_pct": 1})
-    assert req["questions"] is T1 and req["state"] == {"server_observations": {"cpu_pct": 1}}
+    assert req["questions"] == T1 and req["state"] == {"server_observations": {"cpu_pct": 1}}
     custom = c.build_request({"x": 1}, questions={"q": {}}, state_key="observations")
     assert custom["questions"] == {"q": {}} and custom["state"] == {"observations": {"x": 1}}
 

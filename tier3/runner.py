@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from prompts.loader import engine_prompt
 from tier2.runner import new_run_id, persist  # noqa: F401 - re-exported for the CLI
 from tier3.engine import STATUS_ERROR as DECISION_ERROR
 from tier3.engine import STATUS_OK as DECISION_OK
@@ -116,6 +117,7 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
                          "acceptable_actions": list(scn.expected.acceptable_actions)},
         "status": STATUS_OK, "message": "", "versions": cfg.versions, "git_commit": cfg.git_commit,
         "engine": engine_info(deps.engine),
+        "prompt": engine_prompt(deps.engine),
         "polls": [],
     }
     injected, timer = False, None
@@ -303,6 +305,7 @@ def run_batch(scenarios: list[Scenario], deps: Deps, cfg: Config, results_dir: P
         if stopped:
             break
     summary = {"run_id": run_id, "mode": cfg.mode, "repeats": repeats, "stopped_early": stopped,
+               "prompt": engine_prompt(deps.engine),
                "scorecard": scorecard_data(records),
                "runs": [{"experiment_id": r["experiment_id"], "status": r["status"],
                          "evaluation": r["evaluation"],

@@ -12,6 +12,7 @@ from typing import Callable
 import requests
 
 from jev.client import STATUS_ERROR, Decision
+from jev.client import load_prompt
 from llm.prompt import SYSTEM_PROMPT, build_prompt, build_schema, parse_answer
 
 DEFAULT_URL = "http://localhost:11434"
@@ -26,10 +27,11 @@ class OllamaEngine:
     accepts_seed = True
 
     def __init__(self, model: str, url: str = DEFAULT_URL,
-                 post: Callable = _default_post):
+                 post: Callable = _default_post, prompt=None):
         self.model = model
         self.url = url.rstrip("/")
         self._post = post
+        self.prompt = prompt or load_prompt()
         self.info = {"name": f"ollama:{model}", "transport": "ollama", "model_requested": model,
                      "ollama_url": self.url}
 
@@ -37,9 +39,10 @@ class OllamaEngine:
         options = {"temperature": 0}
         if seed is not None:
             options["seed"] = seed
-        return {"model": self.model, "stream": False, "format": build_schema(), "options": options,
+        return {"model": self.model, "stream": False, "format": build_schema(self.prompt.questions),
+                "options": options,
                 "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-                             {"role": "user", "content": build_prompt(observations)}]}
+                             {"role": "user", "content": build_prompt(observations, self.prompt.questions)}]}
 
     def decide(self, observations: dict, seed: int | None = None) -> Decision:
         payload = self.build_request(observations, seed)
@@ -60,7 +63,7 @@ class OllamaEngine:
             d = Decision(status=STATUS_ERROR, message="Ollama response is not JSON")
             return self._finish(d, payload, started, resp.status_code)
         content = (body.get("message") or {}).get("content") if isinstance(body, dict) else None
-        d = parse_answer(content, raw=body)
+        d = parse_answer(content, raw=body, questions=self.prompt.questions)
         d.raw_response = body
         if isinstance(body, dict):
             d.input_tokens = body.get("prompt_eval_count") if isinstance(body.get("prompt_eval_count"), int) else None

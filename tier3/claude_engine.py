@@ -21,7 +21,7 @@ from llm.claude import ClaudeCLIEngine as _Tier1CLIEngine
 from llm.claude import EFFORTS, MAX_RETRIES, MAX_TOKENS, MODELS, TIMEOUT_S, _num, _run, total_input_tokens
 from llm.engines import _prices, fallback_notice
 from tier3.engine import STATUS_ERROR, STATUS_INVALID, STATUS_OK, Decision
-from tier3.questions import QUESTIONS
+from tier3.questions import QUESTIONS, load_prompt
 
 SYSTEM_PROMPT = ("You assess the observed state of an application running on a Kubernetes "
                  "cluster and answer each question with exactly one of the allowed options.")
@@ -32,31 +32,31 @@ class ConfigError(Exception):
     pass  # a bad setting, raised before any call
 
 
-def options(qid: str) -> dict[str, str]:
-    return dict(QUESTIONS[qid]["criteria"])
+def options(qid: str, questions: dict = QUESTIONS) -> dict[str, str]:
+    return dict(questions[qid]["criteria"])
 
 
-def build_schema() -> dict:
+def build_schema(questions: dict = QUESTIONS) -> dict:
     return {
         "type": "object",
-        "properties": {qid: {"type": "string", "enum": list(options(qid))} for qid in QUESTIONS},
-        "required": list(QUESTIONS),
+        "properties": {qid: {"type": "string", "enum": list(options(qid, questions))} for qid in questions},
+        "required": list(questions),
         "additionalProperties": False,
     }
 
 
-def build_prompt(observation: dict) -> str:
+def build_prompt(observation: dict, questions: dict = QUESTIONS) -> str:
     lines = ["Questions. Answer each one with exactly one allowed option.", ""]
-    for qid, q in QUESTIONS.items():
+    for qid, q in questions.items():
         lines.append(f"{qid}: {q['instructions']}")
-        lines += [f"  - {opt}: {desc}" for opt, desc in options(qid).items()]
+        lines += [f"  - {opt}: {desc}" for opt, desc in options(qid, questions).items()]
         lines.append("")
-    lines += ["Reply with a JSON object with the keys " + ", ".join(QUESTIONS) + ".", "",
+    lines += ["Reply with a JSON object with the keys " + ", ".join(questions) + ".", "",
               "State:", json.dumps({STATE_KEY: observation}, indent=2)]
     return "\n".join(lines)
 
 
-def parse_answer(data, raw=None) -> Decision:
+def parse_answer(data, raw=None, questions: dict = QUESTIONS) -> Decision:
     """Strict: all four fields, each in its allowed set, or 'invalid'. Never coerces."""
     raw = data if raw is None else raw
     if isinstance(data, str):
@@ -67,9 +67,9 @@ def parse_answer(data, raw=None) -> Decision:
     if not isinstance(data, dict):
         return Decision(status=STATUS_INVALID, raw_response=raw, message="reply is not a JSON object")
     out = Decision(status=STATUS_OK, raw_response=raw)
-    for qid in QUESTIONS:
+    for qid in questions:
         v = data.get(qid)
-        if not isinstance(v, str) or v not in options(qid):
+        if not isinstance(v, str) or v not in options(qid, questions):
             return Decision(status=STATUS_INVALID, raw_response=raw,
                             message=f"{qid}: missing or out-of-set value ({v!r})")
         setattr(out, qid, v == "true" if qid == "incident_detected" else v)
@@ -89,7 +89,7 @@ class ClaudeAPIEngine:
 
     def __init__(self, name: str = "claude-opus", effort: str = "medium", client=None,
                  prices: tuple[float | None, float | None] = (None, None),
-                 sleep: Callable[[float], None] = time.sleep):
+                 sleep: Callable[[float], None] = time.sleep, prompt=None):
         import anthropic
 
         self._anthropic = anthropic
@@ -98,13 +98,15 @@ class ClaudeAPIEngine:
         self.prices = prices
         self._client = client or anthropic.Anthropic(max_retries=0, timeout=TIMEOUT_S)
         self._sleep = sleep
+        self.prompt = prompt or load_prompt()
         self.info = {"name": name, "transport": "anthropic-api", "model_requested": self.model,
                      "effort": effort}
 
     def request(self, observation: dict) -> dict:
         return dict(model=self.model, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": build_prompt(observation)}],
-                    output_config={"format": {"type": "json_schema", "schema": build_schema()},
+                    messages=[{"role": "user", "content": build_prompt(observation, self.prompt.questions)}],
+                    output_config={"format": {"type": "json_schema",
+                                                "schema": build_schema(self.prompt.questions)},
                                    "effort": self.effort})
 
     def decide(self, observation: dict) -> Decision:
@@ -144,7 +146,7 @@ class ClaudeAPIEngine:
             d = Decision(status=STATUS_INVALID, raw_response=raw, message="reply cut off at max_tokens")
         else:
             text = next((b.text for b in resp.content if b.type == "text"), None)
-            d = parse_answer(text, raw=raw) if text is not None else Decision(
+            d = parse_answer(text, raw=raw, questions=self.prompt.questions) if text is not None else Decision(
                 status=STATUS_INVALID, raw_response=raw, message="reply has no text block")
             d.raw_response = raw
         usage = raw.get("usage") or {}
@@ -169,23 +171,25 @@ class ClaudeCLIEngine:
 
     def __init__(self, name: str = "claude-opus", effort: str = "medium", claude: str = "claude",
                  runner=_run, prices: tuple[float | None, float | None] = (None, None),
-                 cli_version: str | None = None):
+                 cli_version: str | None = None, prompt=None):
         self.model = MODELS[name]
         self.effort = effort
         self.claude = claude
         self.prices = prices
         self._run = runner
+        self.prompt = prompt or load_prompt()
         self.info = {"name": name, "transport": "claude-cli", "model_requested": self.model,
                      "effort": effort, "cli_version": cli_version}
 
     def command(self) -> list[str]:
         return [self.claude, "-p", "--model", self.model, "--output-format", "json",
-                "--json-schema", json.dumps(build_schema()), "--system-prompt", SYSTEM_PROMPT,
+                "--json-schema", json.dumps(build_schema(self.prompt.questions)),
+                "--system-prompt", SYSTEM_PROMPT,
                 "--tools", "", "--effort", self.effort, "--no-session-persistence",
                 "--strict-mcp-config", "--setting-sources", ""]
 
     def decide(self, observation: dict) -> Decision:
-        prompt = build_prompt(observation)
+        prompt = build_prompt(observation, self.prompt.questions)
         started = time.perf_counter()
         with tempfile.TemporaryDirectory(prefix="llm-baseline-") as cwd:
             try:
@@ -209,7 +213,8 @@ class ClaudeCLIEngine:
             return self._finish(Decision(status=STATUS_ERROR, message=f"claude CLI error: {msg}"),
                                 prompt, started)
         answer = body.get("structured_output")
-        d = parse_answer(answer if isinstance(answer, dict) else body.get("result"), raw=body)
+        d = parse_answer(answer if isinstance(answer, dict) else body.get("result"), raw=body,
+                         questions=self.prompt.questions)
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
         models = body.get("modelUsage")
         out = usage.get("output_tokens")
@@ -230,7 +235,8 @@ class ClaudeCLIEngine:
         return d
 
 
-def build_claude_engine(name: str = "claude-opus", *, which=shutil.which, err=sys.stderr):
+def build_claude_engine(name: str = "claude-opus", *, which=shutil.which, err=sys.stderr,
+                        prompt=None):
     """API engine when ANTHROPIC_API_KEY is set, else the CLI fallback with a loud notice.
     Raises ConfigError before any call."""
     try:
@@ -246,7 +252,7 @@ def build_claude_engine(name: str = "claude-opus", *, which=shutil.which, err=sy
     except Exception as e:  # noqa: BLE001 - a malformed price variable
         raise ConfigError(str(e)) from e
     if os.environ.get("ANTHROPIC_API_KEY", "").strip():
-        return ClaudeAPIEngine(name, effort=effort, prices=prices)
+        return ClaudeAPIEngine(name, effort=effort, prices=prices, prompt=prompt)
     claude = which("claude")
     if not claude:
         raise ConfigError(f"{name} needs either ANTHROPIC_API_KEY (Anthropic API) or the claude "
@@ -259,6 +265,7 @@ def build_claude_engine(name: str = "claude-opus", *, which=shutil.which, err=sy
                                  timeout=15).stdout.strip() or None
     except (OSError, subprocess.SubprocessError):
         version = None
-    engine = ClaudeCLIEngine(name, effort=effort, claude=claude, prices=prices, cli_version=version)
+    engine = ClaudeCLIEngine(name, effort=effort, claude=claude, prices=prices, cli_version=version,
+                             prompt=prompt)
     engine.info["notice"] = notice
     return engine

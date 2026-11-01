@@ -31,27 +31,47 @@ def _clients():
                 workload=Workload(testbed.base_url()))
 
 
-def build_engine(name: str = "jev"):
-    """The engine behind every poll. Raises SystemExit on a configuration error, before any run."""
+def build_engine(name: str = "jev", prompt=None):
+    """The engine behind every poll, asking the given prompt variant (the baseline if None).
+    Raises SystemExit on a configuration error, before any run."""
     if name == "jev":
         from tier3.jev_adapter import ConfigError, JevAdapter
         try:
-            return JevAdapter()
+            return JevAdapter(prompt=prompt)
         except ConfigError as e:
             raise SystemExit(f"error: {e}")
     from tier3.claude_engine import ConfigError, build_claude_engine
     try:
-        return build_claude_engine(name)
+        return build_claude_engine(name, prompt=prompt)
     except ConfigError as e:
         raise SystemExit(f"error: {e}")
 
 
-def build_deps(engine: str = "jev"):
+def add_prompt_arg(p) -> None:
+    from prompts.loader import DEFAULT_VARIANT, list_variants
+    p.add_argument("--prompt", default=DEFAULT_VARIANT,
+                   help=f"prompt variant (prompts/tier3/*.yaml): {', '.join(list_variants('tier3'))} "
+                        f"(default {DEFAULT_VARIANT})")
+
+
+def resolve_prompt(ap, args) -> None:
+    """Load --prompt into args.prompt_variant, or exit before any run with the variants listed."""
+    from prompts.loader import VariantError
+    from tier3.questions import load_prompt
+    args.prompt_variant = None
+    if getattr(args, "prompt", None) is not None:
+        try:
+            args.prompt_variant = load_prompt(args.prompt)
+        except VariantError as e:
+            ap.error(str(e))
+
+
+def build_deps(engine: str = "jev", prompt=None):
     from tier3.collect import collect, kube_state
     from tier3.deadman import Deadman
     from tier3.runner import Deps
 
-    engine = build_engine(engine)
+    engine = build_engine(engine, prompt)
     c = _clients()
 
     def health():
@@ -117,6 +137,7 @@ def main(argv=None) -> int:
     for p in (r, b):
         p.add_argument("--mode", choices=("poll", "single"), default="poll")
         p.add_argument("--engine", choices=ENGINES, default="jev")
+        add_prompt_arg(p)
         p.add_argument("--results-dir", default=str(DEFAULT_RESULTS))
     for name, hlp in (("scorecard", "print the scorecard for a results directory"),
                       ("export-lfedge", "write JSONL in the LF Edge harness's field names"),
@@ -126,6 +147,7 @@ def main(argv=None) -> int:
         if name != "scorecard":
             p.add_argument("-o", "--output")
     args = ap.parse_args(argv)
+    resolve_prompt(ap, args)
 
     if args.cmd == "list":
         print(format_list())
@@ -164,7 +186,7 @@ def main(argv=None) -> int:
     except ScenarioError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    deps, cfg = build_deps(args.engine), make_config(args.mode)
+    deps, cfg = build_deps(args.engine, args.prompt_variant), make_config(args.mode)
     if args.cmd == "run":
         rec = run_experiment(scns[0], deps, cfg, new_run_id(), Path(args.results_dir))
         print_record(rec)

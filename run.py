@@ -27,8 +27,9 @@ from pathlib import Path
 
 from evaluation.evaluator import FIELDS, aggregate, format_summary, make_record
 from generator.server_state import generate
-from jev.client import ConfigError
+from jev.client import ConfigError, load_prompt
 from llm.engines import ENGINE_CHOICES, build_engine, engine_info, engine_slug, parse_engine
+from prompts.loader import DEFAULT_VARIANT, VariantError, engine_prompt, list_variants
 from scenarios.definitions import get_scenario, scenario_names
 
 
@@ -152,6 +153,7 @@ def format_run(record: dict) -> str:
 def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None, out=print,
                    include_logs=True):
     info = engine_info(client)
+    prompt = engine_prompt(client)
     verbose = (runs == 1) if verbose is None else verbose
     records = []
     started_at = datetime.now(timezone.utc)
@@ -167,6 +169,7 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
             decision = client.decide(obs)
         rec = make_record(i, name, seed, obs, scenario.expected, decision)
         rec["engine"] = {**info, "model_version": decision.to_dict().get("model_version")}
+        rec["prompt"] = prompt
         rec["include_logs"] = include_logs
         rec["log_lines_sent"] = len(obs.get("logs", []))
         rec["started_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -185,6 +188,8 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     suffix = "" if info["name"] == "jev" else f"-{engine_slug(info['name'])}"
+    if prompt and prompt["name"] != DEFAULT_VARIANT:
+        suffix += f"-prompt-{prompt['name']}"
     base = out_dir / f"{stamp}-{runs}runs{'' if include_logs else '-nologs'}{suffix}"
     with open(f"{base}.jsonl", "w") as fh:
         for r in records:
@@ -199,6 +204,7 @@ def run_experiment(client, scenario_arg, runs, base_seed, out_dir, verbose=None,
             "python": platform.python_version(),
             "platform": platform.platform(),
             "engine": info,
+            "prompt": prompt,
             "jev_url": getattr(getattr(client, "config", None), "url", None),
             "jev_model_requested": getattr(getattr(client, "config", None), "model", None),
             "models": sorted({r["decision"].get("model_version") for r in records
@@ -222,6 +228,9 @@ def parse_args(argv=None):
     p.add_argument("--verbose", action="store_true", help="print full detail for every run in a batch")
     p.add_argument("--no-logs", action="store_true",
                    help="withhold application logs from the engine (metrics only), to compare against runs with logs")
+    p.add_argument("--prompt", default=DEFAULT_VARIANT,
+                   help=f"prompt variant (prompts/tier1/*.yaml): {', '.join(list_variants('tier1'))} "
+                        f"(default {DEFAULT_VARIANT})")
     p.add_argument("--engine", default="jev",
                    help=f"who answers: {', '.join(ENGINE_CHOICES)} (default jev)")
     a = p.parse_args(argv)
@@ -230,6 +239,10 @@ def parse_args(argv=None):
     try:
         parse_engine(a.engine)
     except ValueError as e:
+        p.error(str(e))
+    try:
+        a.prompt_variant = load_prompt(a.prompt)
+    except VariantError as e:
         p.error(str(e))
     if a.scenario and a.scenario != "random" and a.scenario not in scenario_names():
         p.error(f"unknown scenario {a.scenario!r}; valid: {', '.join(scenario_names())}, random")
@@ -240,12 +253,13 @@ def main(argv=None, client=None) -> int:
     a = parse_args(argv)
     if client is None:
         try:
-            client = build_engine(a.engine)
+            client = build_engine(a.engine, prompt=a.prompt_variant)
         except ConfigError as e:
             print(f"error: {e}", file=sys.stderr)
             return 2
     seed = a.seed if a.seed is not None else random.SystemRandom().randrange(1_000_000)
-    print(f"Base seed: {seed}\n")
+    print(f"Base seed: {seed}")
+    print(f"Prompt: {a.prompt}\n")
     run_experiment(client, a.scenario, a.runs, seed, a.output_dir, verbose=a.verbose or None,
                    include_logs=not a.no_logs)
     return 0
