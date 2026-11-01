@@ -17,7 +17,8 @@ from jev.client import STATUS_ERROR, STATUS_INVALID, Decision
 from jev.client import load_prompt
 from llm.prompt import SYSTEM_PROMPT, build_prompt, build_schema, parse_answer
 
-MODELS = {"claude-sonnet": "claude-sonnet-5-5", "claude-opus": "claude-opus-5-5"}
+MODELS = {"claude-haiku": "claude-haiku-5-5", "claude-sonnet": "claude-sonnet-5-5",
+          "claude-opus": "claude-opus-5-5"}
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 MAX_TOKENS = 16000  # room for adaptive thinking before the short JSON answer
 MAX_RETRIES = 3

@@ -138,6 +138,7 @@ Is Jev better than asking a general-purpose LLM? `--engine` sends the same obser
 | Engine | Model | Needs |
 |---|---|---|
 | `jev` (default) | Jev (`jev-latest`) | `JEV_API_KEY` |
+| `claude-haiku` | Claude Haiku 5.5 (`claude-haiku-5-5`) | `ANTHROPIC_API_KEY`, or the `claude` CLI |
 | `claude-sonnet` | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | `ANTHROPIC_API_KEY`, or the `claude` CLI |
 | `claude-opus` | Claude Opus 5.5 (`claude-opus-5-5`) | `ANTHROPIC_API_KEY`, or the `claude` CLI |
 | `ollama:<model>` | any local Ollama model, for example `ollama:qwen3:8b` | Ollama running locally |
@@ -219,7 +220,8 @@ Dependencies are pinned in `requirements.txt` to the tested versions.
 | `ANTHROPIC_API_KEY` | only for `--engine claude-*` via the API | none (without it, the `claude` CLI is used) |
 | `LLM_EFFORT` | no | `medium` (Claude effort: `low`, `medium`, `high`, `xhigh`, `max`) |
 | `OLLAMA_URL` | no | `http://localhost:11434` |
-| `CLAUDE_SONNET_PRICE_INPUT_PER_MTOK`, `CLAUDE_SONNET_PRICE_OUTPUT_PER_MTOK` | no | none (USD per million tokens, to estimate cost) |
+| `CLAUDE_HAIKU_PRICE_INPUT_PER_MTOK`, `CLAUDE_HAIKU_PRICE_OUTPUT_PER_MTOK` | no | none (USD per million tokens, to estimate cost) |
+| `CLAUDE_SONNET_PRICE_INPUT_PER_MTOK`, `CLAUDE_SONNET_PRICE_OUTPUT_PER_MTOK` | no | none |
 | `CLAUDE_OPUS_PRICE_INPUT_PER_MTOK`, `CLAUDE_OPUS_PRICE_OUTPUT_PER_MTOK` | no | none |
 
 `.env` is git-ignored. Never commit a key.

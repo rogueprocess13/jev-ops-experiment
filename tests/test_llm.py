@@ -383,3 +383,12 @@ def test_ollama_unknown_model_is_error():
     eng, _ = ollama([Resp(404, text='{"error":"model not found"}')])
     d = eng.decide({})
     assert d.status == "error" and d.http_status == 404
+
+
+def test_haiku_engine_uses_the_haiku_model_id():
+    sdk = FakeSDK([FakeMessage(json.dumps(GOOD), model="claude-haiku-5-5")])
+    eng = ClaudeAPIEngine("claude-haiku", client=sdk, sleep=lambda _: None)
+    d = eng.decide({"cpu_pct": 1})
+    call = sdk.calls[0]
+    assert call["model"] == "claude-haiku-5-5" and call["output_config"]["effort"] == "medium"
+    assert eng.info["transport"] == "anthropic-api" and d.model_version == "claude-haiku-5-5"

@@ -7,7 +7,7 @@
 #   ./run-all.sh 70 --no-logs metrics only, to compare with a run that has logs
 #   ./run-all.sh 50 --seed 1234 --scenario contradictory   extra args go to run.py
 #   ./run-all.sh 70 --seed 1000 --engine claude-sonnet     baseline LLM instead of Jev
-#                             (engines: jev, claude-sonnet, claude-opus, ollama:<model>)
+#                             (engines: jev, claude-haiku, claude-sonnet, claude-opus, ollama:<model>)
 #
 # Environment: SKIP_TESTS=1 skips pytest. PYTHON=/path/to/python picks the interpreter.
 set -euo pipefail

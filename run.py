@@ -8,7 +8,7 @@
     python run.py --runs 70 --no-logs              same, but metrics only (no logs)
     python run.py --runs 70 --engine claude-sonnet same batch, answered by a baseline LLM
 
-Engines: jev (default), claude-sonnet, claude-opus, ollama:<model>. Every engine
+Engines: jev (default), claude-haiku, claude-sonnet, claude-opus, ollama:<model>. Every engine
 gets the same observation and the same questions.
 
 Read-only: it generates data, asks the engine, and records the answer. It never acts on it.

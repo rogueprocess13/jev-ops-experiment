@@ -1,4 +1,4 @@
-"""Engine selection for run.py: jev (default), claude-sonnet, claude-opus, ollama:<model>."""
+"""Engine selection for run.py: jev (default), claude-haiku, claude-sonnet, claude-opus, ollama:<model>."""
 from __future__ import annotations
 
 import os
