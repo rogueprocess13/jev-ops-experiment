@@ -1,13 +1,20 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
+# v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
 name: strict-incident
-version: 1
+version: 2
 tier: tier3
 style: policy
 rationale: 'Policy stated. Only the incident question changes. Dev notes finding 1: false alarms come
   from failures that had already recovered while their errors were still inside the observation window.
-  This asks about the end of the window and says a recovered failure is not an incident now. Tier 4 uses
-  it too; on Tier 4 records, a removed false alarm shows as censored on replay.'
+  This asks about the end of the window and says a recovered failure is not an incident now. The latency
+  clause ("much slower ... well beyond the normal variation") and the noise clause ("small or noisy
+  changes with no errors") are shared with the Tier 2 variant, so a latency-only fault may be missed.
+  Risk: the end-of-window wording pushes toward "no" where requests look fine but the cluster is not,
+  such as a lost node whose services have moved (K009) or a stuck rollout with no errors (K005), both
+  expected incidents; v2 adds "a component or node is out of service, or a rollout is stuck" to the
+  "yes" text to cover them. Tier 4 uses it too; on Tier 4 records, a removed false alarm shows as
+  censored on replay.'
 dev_records:
 - results/tier3/10.3-combined
 questions:
@@ -16,8 +23,8 @@ questions:
       or cluster?
     criteria:
       'true': 'Yes: at the end of the window something is still failing. Requests are failing, a service
-        or component is unavailable, or requests are much slower than in the baseline window, well beyond
-        the normal variation between windows.'
+        or component is unavailable, a component or node is out of service, a rollout is stuck, or requests
+        are much slower than in the baseline window, well beyond the normal variation between windows.'
       'false': 'No: the application or cluster works normally at the end of the window. A failure that
         has already recovered is not an incident now. Small or noisy changes with no errors are not an
         incident.'

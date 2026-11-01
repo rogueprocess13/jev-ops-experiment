@@ -1,13 +1,17 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
+# v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
 name: strict-incident
-version: 1
+version: 2
 tier: tier1
 style: policy
 rationale: 'Policy stated. Only the human-review question changes. Dev notes finding 4: the baseline asks
-  for review on routine, contained cases (investigate a clear cause, a standard restart), because the
-  question gives no rule for when review is needed. This states that rule in general operational terms.
-  Severity, action and cause wording are the baseline''s.'
+  for review on routine, contained cases, because the question gives no rule for when review is needed.
+  This states one general rule: review when the diagnosis is not certain or the fix is more than a routine,
+  reversible step. v2: v1 listed clauses that mapped almost one to one onto the Tier 1 cases, some in
+  their own wording, and its "look into a clear cause" clause contradicted a case whose expected answer
+  is yes; the review judged it fitted to the test set. Severity, action and cause wording are the
+  baseline''s.'
 dev_records:
 - results/20261018-134025-70runs.jsonl
 questions:
@@ -38,7 +42,6 @@ questions:
   human_review:
     instructions: Should a person review this situation before any action is taken?
     criteria:
-      'true': Yes, when the evidence is weak, mixed or does not fit together; when the failure is severe
-        or spreading; or when the likely fix is risky or more than a standard restart.
-      'false': 'No, when the problem is contained and the next step is routine: keep watching, look into
-        a clear cause, or apply a standard low-risk restart.'
+      'true': Yes, when the diagnosis cannot be made with confidence, or when the likely fix carries risk
+        beyond a routine, reversible step.
+      'false': No, otherwise.

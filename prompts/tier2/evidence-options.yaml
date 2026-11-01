@@ -1,13 +1,18 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
+# v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
 name: evidence-options
-version: 1
+version: 2
 tier: tier2
 style: wording
 rationale: 'Wording only. Service and diagnosis options describe what each looks like. Dev notes finding
   3: the baseline names the caller that reports the errors instead of the service that failed, so the
-  service options say the failure starts in that service itself. Questions and action wording are the
-  baseline''s.'
+  service options say the failure starts in that service itself. Risk, cuts both ways: in some faults
+  the expected origin is the caller that reports the errors or slowness from below (F004, F006), so
+  "not when it only reports errors from a service it calls" may lower localization there while raising
+  it on F003; read a localization drop on those as this trade-off, not a surprise. v2: dropped "Choose
+  this rather than guessing" from `unknown` (a decision bias, so policy, not wording). Questions and
+  action wording are the baseline''s.'
 dev_records:
 - results/tier2/20261012-190447-369b
 questions:
@@ -36,7 +41,7 @@ questions:
       database_contention: A database or data store answers slowly, or with lock or time-out errors.
       resource_exhaustion: A service runs out of CPU, memory or capacity, so it slows down or fails under
         its normal load.
-      unknown: The signals are weak, mixed or point to different causes. Choose this rather than guessing.
+      unknown: The signals are weak, mixed or point to different causes.
   recommended_action:
     instructions: What single operational action should be taken now?
     criteria:

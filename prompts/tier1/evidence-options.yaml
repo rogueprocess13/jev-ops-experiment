@@ -1,13 +1,17 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
+# v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
 name: evidence-options
-version: 1
+version: 2
 tier: tier1
 style: wording
 rationale: 'Wording only. Severity and cause options describe what each looks like in the observation.
   Dev notes finding 5: the baseline names a specific cause where the evidence supports none, so `unknown`
-  is described as the answer for weak or mixed signals. Questions, action and human-review wording are
-  the baseline''s.'
+  says what weak or mixed signals look like. v2: dropped "Choose this rather than guessing" from
+  `unknown` (a decision bias, so policy, not wording); "one part of the service has stopped doing its
+  work" (a paraphrase of one case) became "a component is failing or stalled"; "or resources at their
+  limit" left `critical`, as it could push a high-resource case with contradictory signals to critical.
+  Questions, action and human-review wording are the baseline''s.'
 dev_records:
 - results/20261018-134025-70runs.jsonl
 questions:
@@ -17,10 +21,9 @@ questions:
       normal: Metrics, service statuses and logs are within their normal ranges. No sign of a problem.
       degraded: Some signals are worse than normal, or the evidence is weak, but the service still works
         for its users.
-      high: 'Clear impairment that users would notice: errors, time-outs or slowness, or one part of the
-        service has stopped doing its work.'
-      critical: 'The service is down or about to fail: very high error rates, an outage, or resources
-        at their limit.'
+      high: 'Clear impairment that users would notice: errors, time-outs or slowness, or a component is
+        failing or stalled.'
+      critical: 'The service is down or about to fail: very high error rates or an outage.'
   action:
     instructions: What single operational action should be taken now?
     criteria:
@@ -40,7 +43,7 @@ questions:
         the logs, while resources and dependencies are fine.
       configuration: A setting is wrong or was changed, and the errors start right after the change.
       network: Connections between machines drop, time out or lose packets.
-      unknown: The signals are weak, mixed or point to different causes. Choose this rather than guessing.
+      unknown: The signals are weak, mixed or point to different causes.
   human_review:
     instructions: Should a human review this situation before any action is taken?
     criteria:

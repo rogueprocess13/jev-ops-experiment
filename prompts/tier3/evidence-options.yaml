@@ -1,13 +1,15 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
+# v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
 name: evidence-options
-version: 1
+version: 2
 tier: tier3
 style: wording
 rationale: 'Wording only. Component and diagnosis options describe what each looks like. Dev notes finding
   3: the baseline names frontend or frontend-proxy when a dependency has no available instances or a node
   was evicted, so component options say the failure starts in that component itself. Questions and action
-  wording are the baseline''s.'
+  wording are the baseline''s. v2: dropped "Choose this rather than guessing" from `unknown` (a decision
+  bias, so policy, not wording).'
 dev_records:
 - results/tier3/10.3-combined
 questions:
@@ -45,8 +47,7 @@ questions:
         rise with the load.
       application_failure: The service's own work returns errors while its instances are available and
         what it calls is working.
-      unknown: The signals are weak, mixed or point to different failure modes. Choose this rather than
-        guessing.
+      unknown: The signals are weak, mixed or point to different failure modes.
   recommended_action:
     instructions: What single operational action should be taken now?
     criteria:
