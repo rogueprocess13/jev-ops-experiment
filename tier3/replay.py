@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Callable
 
 from prompts.loader import engine_prompt, record_prompt
-from tier2.runner import new_run_id, persist
+from tier2.runner import new_run_id
 from tier3.engine import STATUS_ERROR, STATUS_OK, Decision
 from tier3.evaluate import evaluate, false_positive_polls
 from tier3.runner import _decision_dict, _usage, engine_info
@@ -134,6 +134,20 @@ def plan(sources: list[tuple[Path, dict]]) -> dict:
     return {"replay": use, "skipped": skipped, "engine_calls": sum(len(r["polls"]) for _, r in use)}
 
 
+def write_replay(rec: dict, dest: Path, source: Path) -> Path:
+    """Write a replay record under the source file's own name, so `K001-2.json` replays
+    `K001-2.json`. A second source with the same name (from another run directory) gets
+    `-r2`, `-r3`, ..."""
+    d = Path(dest) / rec["run_id"]
+    d.mkdir(parents=True, exist_ok=True)
+    p, n = d / Path(source).name, 1
+    while p.exists():
+        n += 1
+        p = d / f"{Path(source).stem}-r{n}.json"
+    p.write_text(json.dumps(rec, indent=2, default=str))
+    return p
+
+
 def replay_batch(source: str | Path, engine, results_dir: str | Path, *, run_id: str | None = None,
                  clock: Callable[[], float] | None = None, out=print) -> dict:
     """Replay every ok record under `source`. Writes one replay record per source record
@@ -146,7 +160,7 @@ def replay_batch(source: str | Path, engine, results_dir: str | Path, *, run_id:
     records = []
     for i, (path, src) in enumerate(p["replay"], 1):
         rec = replay_record(src, engine, run_id=run_id, source_path=str(path), clock=clock)
-        persist(rec, dest)
+        write_replay(rec, dest, path)
         records.append(rec)
         det = "detected" if rec["detect_poll"] else ("censored" if rec["censored"] else "no incident")
         out(f"[{i}/{len(p['replay'])}] {src['experiment_id']:<5} {len(rec['polls']):>2} polls  "

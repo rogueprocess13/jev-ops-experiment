@@ -19,7 +19,7 @@ from typing import Callable
 from prompts.loader import engine_prompt, record_prompt
 from tier2.engine import STATUS_ERROR, Decision
 from tier2.evaluate import aggregate, evaluate, is_false_positive
-from tier2.runner import new_run_id, persist
+from tier2.runner import new_run_id
 from tier2.scenarios import GroundTruth
 
 REPLAY_DIR = "replay"
@@ -95,6 +95,20 @@ def replay_record(src: dict, engine, *, run_id: str, source_path: str | None = N
     return rec
 
 
+def write_replay(rec: dict, dest: Path, source: Path) -> Path:
+    """Write a replay record under the source file's own name, so `K001-2.json` replays
+    `K001-2.json`. A second source with the same name (from another run directory) gets
+    `-r2`, `-r3`, ..."""
+    d = Path(dest) / rec["run_id"]
+    d.mkdir(parents=True, exist_ok=True)
+    p, n = d / Path(source).name, 1
+    while p.exists():
+        n += 1
+        p = d / f"{Path(source).stem}-r{n}.json"
+    p.write_text(json.dumps(rec, indent=2, default=str))
+    return p
+
+
 def replay_batch(source: str | Path, engine, results_dir: str | Path, *, run_id: str | None = None,
                  clock: Callable[[], float] | None = None, out=print) -> dict:
     run_id = run_id or new_run_id()
@@ -103,7 +117,7 @@ def replay_batch(source: str | Path, engine, results_dir: str | Path, *, run_id:
     records = []
     for i, (path, src) in enumerate(p["replay"], 1):
         rec = replay_record(src, engine, run_id=run_id, source_path=str(path), clock=clock)
-        persist(rec, dest)
+        write_replay(rec, dest, path)
         records.append(rec)
         out(f"[{i}/{len(p['replay'])}] {src['experiment_id']:<5} {rec['status']:<5} "
             f"incident={rec['jev']['incident_detected']}")

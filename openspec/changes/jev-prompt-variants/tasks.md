@@ -28,11 +28,11 @@
 
 ## 5. Comparison report
 
-- [ ] 5.1 `python -m tier3 compare` and `python -m tier2 compare`: group by `(engine, prompt, version)`, the rows in the comparison spec, `k/n (p%)` cells, `n/a` for empty denominators, F1 as a fraction plus a decimal
-- [ ] 5.2 Common-source check with a warning and the differing run IDs; never mix live and replay in one group; error on a hash conflict
-- [ ] 5.3 `--dev` and `--confirm`: confirm table first, flag variants whose `dev_records` overlap the confirm set; show the same-day replayed baseline next to the original live records
-- [ ] 5.4 `report.py --compare`: columns labelled `engine / prompt`; `--by-prompt` grouping
-- [ ] 5.5 Offline tests over fixture records for every row, the warnings, the hash error and the dev/confirm layout
+- [x] 5.1 `python -m tier3 compare` and `python -m tier2 compare`: group by `(engine, prompt, version)`, the rows in the comparison spec, `k/n (p%)` cells, `n/a` for empty denominators, F1 as a fraction plus a decimal (shared layout in `prompts/compare.py`, rows in `tier3/compare.py` and `tier2/compare.py`; `--unpaired` added for batches that saw different observations, such as live Jev against live Opus; checked on the real records: Tier 3 dev and Tier 4 Jev/Opus figures match the published scorecards)
+- [x] 5.2 Common-source check with a warning and the differing run IDs; never mix live and replay in one group; error on a hash conflict
+- [x] 5.3 `--dev` and `--confirm`: confirm table first, flag variants whose `dev_records` overlap the confirm set; show the same-day replayed baseline next to the original live records
+- [x] 5.4 `report.py --compare`: columns labelled `engine / prompt`; `--by-prompt` grouping (also `--metrics --by-prompt`, the hash check, and a note for records without a prompt field. Tier 1 has no `--dev`/`--confirm`: its sets are separate seeds, so pass the seed-1000 and seed-2000 files to separate `--compare` calls)
+- [x] 5.5 Offline tests over fixture records for every row, the warnings, the hash error and the dev/confirm layout
 
 ## 6. Candidate variants
 

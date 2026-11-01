@@ -178,6 +178,13 @@ def main(argv=None) -> int:
                        help="also read replay records (left out by default)")
         if name != "scorecard":
             p.add_argument("-o", "--output")
+    cp = sub.add_parser("compare", help="prompt variants side by side (live and replay records)")
+    cp.add_argument("results", nargs="*", help="record directories (replay output, live runs, ...)")
+    cp.add_argument("--dev", nargs="+", metavar="DIR", help="source records the variants were written on")
+    cp.add_argument("--confirm", nargs="+", metavar="DIR", help="held-out source records (shown first)")
+    cp.add_argument("--unpaired", action="store_true",
+                    help="compare columns that did not see the same observations (warns)")
+    cp.add_argument("-o", "--output")
     rp = sub.add_parser("replay", help="re-ask stored Tier 3/4 observations under a prompt variant "
                                        "(no cluster; calls the engine once per stored poll)")
     rp.add_argument("records", help="a run record, a run directory, or a parent of several")
@@ -206,6 +213,18 @@ def main(argv=None) -> int:
         return 0
     if args.cmd == "replay":
         return _replay(args)
+    if args.cmd == "compare":
+        from prompts.compare import HashConflict
+        from tier3.compare import format_compare
+        if not (args.results or args.dev or args.confirm):
+            ap.error("compare needs record directories, --dev or --confirm")
+        try:
+            text = format_compare(args.results, args.dev, args.confirm, args.unpaired)
+        except HashConflict as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        _write(text, args.output)
+        return 0
     if args.cmd == "health":
         c = _clients()
         checks = testbed.run_checks(c["kube"], c["prom"], c["jaeger"], c["workload"], c["injector"])

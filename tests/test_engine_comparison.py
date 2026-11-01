@@ -101,7 +101,7 @@ def test_compare_side_by_side(tmp_path):
     a = results(tmp_path, "jev", perfect())
     b = results(tmp_path, "claude-sonnet", wrong, transport="anthropic-api")
     text = report.render_compare([a, b])
-    assert "| | jev | claude-sonnet |" in text
+    assert "| | jev / baseline | claude-sonnet / baseline |" in text
     assert "| Accuracy | 7/7 (100%) | 6/7 (86%) |" in text
     assert "| healthy | 1/1 (100%) | 0/1 (0%) |" in text
     assert "Warning" not in text

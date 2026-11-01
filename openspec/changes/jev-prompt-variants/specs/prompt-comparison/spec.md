@@ -17,6 +17,14 @@ Every cell SHALL show the count, its denominator and a percentage rounded to a w
 ### Requirement: Compare on the same source records
 Groups SHALL be compared over the source run IDs they share. If the sets differ, the report SHALL print a warning listing the differing run IDs, and SHALL compute every figure over the common set only. Live and replay records SHALL NOT be put in one group.
 
+#### Scenario: Different live batches, asked for explicitly
+- **WHEN** `--unpaired` is given for the live Jev and live Opus Tier 4 batches, which share no observations
+- **THEN** each column uses all of its own records, and the report warns that the columns did not see the same observations
+
+#### Scenario: Different live batches without the option
+- **WHEN** the same two batches are compared without `--unpaired`
+- **THEN** every cell shows `n/a`, and the warning says they share no source records
+
 #### Scenario: One replay stopped early
 - **WHEN** the strict-incident replay covers 38 of the 40 records the baseline replay covers
 - **THEN** the report warns, names the two missing run IDs, and compares all groups over the 38

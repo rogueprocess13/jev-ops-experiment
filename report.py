@@ -4,6 +4,7 @@
     python report.py                 latest file in results/
     python report.py results/X.jsonl a specific file
     python report.py --compare A.jsonl B.jsonl ...   engines side by side
+    python report.py --compare A.jsonl B.jsonl --by-prompt   one column per engine and prompt variant
     python report.py --metrics A.jsonl [B.jsonl ...] F1, p95, detection rate, cost... with a glossary
 
 Everything is computed from the records. Nothing is hard-coded.
@@ -19,6 +20,8 @@ from pathlib import Path
 
 from evaluation.evaluator import ALL_FIELDS, aggregate, format_summary
 from evaluation.metrics_report import render_metrics
+from prompts.compare import HashConflict
+from prompts.loader import ASSUMED_NOTE, record_prompt
 
 
 def load(path: Path) -> list[dict]:
@@ -104,10 +107,50 @@ def _pct(c: int, t: int) -> str:
     return "n/a" if not t else f"{c}/{t} ({c / t:.0%})"
 
 
+def prompt_of(records: list[dict]) -> str:
+    """The prompt variant of a set of records, as `name` (plus ` v<n>` after version 1).
+    Records without a prompt field are baseline; a mix is shown as such."""
+    names = sorted({(record_prompt(r)[0]["name"], record_prompt(r)[0]["version"]) for r in records},
+                   key=lambda x: (x[0], x[1] or 0))
+    if len(names) != 1:
+        return "mixed prompts"
+    n, v = names[0]
+    return n if v in (1, None) else f"{n} v{v}"
+
+
 def _label(records: list[dict]) -> str:
     eng = engine_of(records)
     nologs = "" if all(r.get("include_logs", True) for r in records) else " (no logs)"
-    return f"{eng['name']}{nologs}"
+    return f"{eng['name']} / {prompt_of(records)}{nologs}"
+
+
+def check_prompt_hashes(runs: list[tuple[str, list[dict]]]) -> None:
+    """Stop when one prompt name and version carries two hashes (an edited variant)."""
+    seen: dict[tuple, tuple[str, str]] = {}
+    for src, rs in runs:
+        for r in rs:
+            ident, _ = record_prompt(r)
+            if not ident["sha256"]:
+                continue
+            k = (ident["name"], ident["version"])
+            first = seen.setdefault(k, (ident["sha256"], src))
+            if first[0] != ident["sha256"]:
+                raise HashConflict(f"prompt {k[0]!r} v{k[1]} has two different hashes: "
+                                   f"{first[0][:12]}... in {first[1]} and {ident['sha256'][:12]}... in {src}. "
+                                   "A variant file was edited without bumping its version.")
+
+
+def by_prompt(runs: list[tuple[str, list[dict]]]) -> list[tuple[str, list[dict]]]:
+    """Regroup the records of several files by (engine, prompt, logs) instead of by file."""
+    groups: dict[tuple, list[dict]] = {}
+    for _, rs in runs:
+        for r in rs:
+            ident, _ = record_prompt(r)
+            eng = (r.get("engine") or {}).get("name") or "jev"
+            groups.setdefault((eng, ident["name"], ident["version"], r.get("include_logs", True)), []).append(r)
+    return [(f"{e} / {n}" + ("" if v in (1, None) else f" v{v}") + ("" if logs else " (no logs)"), rs)
+            for (e, n, v, logs), rs in sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1] != "baseline",
+                                                                            kv[0][1], kv[0][2] or 0, not kv[0][3]))]
 
 
 def _ms(x) -> str:
@@ -133,7 +176,13 @@ def input_warnings(runs: list[tuple[str, list[dict]]]) -> list[str]:
     logs = {all(r.get("include_logs", True) for r in rs) for _, rs in runs}
     if len(logs) > 1:
         warnings.append("Some files were run with logs and some without (`--no-logs`).")
-    return [line for w in warnings for line in (f"> **Warning:** {w}", "")]
+    if any(prompt_of(rs) == "mixed prompts" for _, rs in runs):
+        warnings.append("A column mixes prompt variants. Use `--by-prompt` to split it.")
+    out = [line for w in warnings for line in (f"> **Warning:** {w}", "")]
+    assumed = sum(1 for _, rs in runs for r in rs if record_prompt(r)[1])
+    if assumed:
+        out += [f"> Note: {assumed} record(s) had {ASSUMED_NOTE}.", ""]
+    return out
 
 
 def render_compare(runs: list[tuple[str, list[dict]]]) -> str:
@@ -207,10 +256,21 @@ def main(argv=None) -> int:
     p.add_argument("--compare", nargs="+", metavar="JSONL", help="two or more results files to compare")
     p.add_argument("--metrics", nargs="+", metavar="JSONL",
                    help="metrics report (F1, p95, detection rate, cost...) for one or more files")
+    p.add_argument("--by-prompt", action="store_true",
+                   help="with --compare or --metrics: one column per engine and prompt variant, not per file")
     a = p.parse_args(argv)
+    if a.by_prompt and not (a.compare or a.metrics):
+        p.error("--by-prompt needs --compare or --metrics")
     if a.metrics:
         paths = [Path(x) for x in a.metrics]
         runs = [(x.name, load(x)) for x in paths]
+        try:
+            check_prompt_hashes(runs)
+        except HashConflict as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        if a.by_prompt:
+            runs = by_prompt(runs)
         text = render_metrics(runs, column_labels(runs), input_warnings(runs) if len(runs) > 1 else [])
         report = paths[0].with_name(datetime.now().strftime("%Y%m%d-%H%M%S") + "-metrics-report.md")
         report.write_text(text)
@@ -218,10 +278,16 @@ def main(argv=None) -> int:
         print(f"Report saved: {report}")
         return 0
     if a.compare:
-        if len(a.compare) < 2:
-            p.error("--compare needs at least two files")
+        if len(a.compare) < 2 and not a.by_prompt:
+            p.error("--compare needs at least two files (or --by-prompt)")
         paths = [Path(x) for x in a.compare]
-        text = render_compare([(x.name, load(x)) for x in paths])
+        runs = [(x.name, load(x)) for x in paths]
+        try:
+            check_prompt_hashes(runs)
+        except HashConflict as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        text = render_compare(by_prompt(runs) if a.by_prompt else runs)
         report = paths[0].with_name(datetime.now().strftime("%Y%m%d-%H%M%S") + "-compare-report.md")
         report.write_text(text)
         print(text)

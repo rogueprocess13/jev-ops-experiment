@@ -79,6 +79,13 @@ def main(argv=None) -> int:
     r.add_argument("experiment_id")
     a = sub.add_parser("run-all", help="run the whole catalogue")
     a.add_argument("--repeats", type=int, default=1)
+    cp = sub.add_parser("compare", help="prompt variants side by side (live and replay records)")
+    cp.add_argument("results", nargs="*", help="record directories (replay output, live runs, ...)")
+    cp.add_argument("--dev", nargs="+", metavar="DIR", help="source records the variants were written on")
+    cp.add_argument("--confirm", nargs="+", metavar="DIR", help="held-out source records (shown first)")
+    cp.add_argument("--unpaired", action="store_true",
+                    help="compare columns that did not see the same observations (warns)")
+    cp.add_argument("-o", "--output")
     rp = sub.add_parser("replay", help="re-ask stored Tier 2 observations under a prompt variant "
                                        "(no Docker; one engine call per record)")
     rp.add_argument("records", help="a run record, a run directory, or a parent of several")
@@ -112,6 +119,22 @@ def main(argv=None) -> int:
         print("reset: " + (", ".join(changed) if changed else "nothing to change"))
         return 0
 
+    if args.cmd == "compare":
+        from prompts.compare import HashConflict
+        from tier2.compare import format_compare
+        if not (args.results or args.dev or args.confirm):
+            ap.error("compare needs record directories, --dev or --confirm")
+        try:
+            text = format_compare(args.results, args.dev, args.confirm, args.unpaired)
+        except HashConflict as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
+        if args.output:
+            Path(args.output).write_text(text)
+            print(f"wrote {args.output}")
+        else:
+            sys.stdout.write(text)
+        return 0
     if args.cmd == "replay":
         from tier2.replay import load_sources, plan, replay_batch
         pl = plan(load_sources(args.records))
