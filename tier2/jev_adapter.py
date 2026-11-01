@@ -2,54 +2,34 @@
 from __future__ import annotations
 
 from jev.client import ConfigError  # re-exported so callers need not import jev.client  # noqa: F401
+from prompts.loader import DEFAULT_VARIANT, NOUL_OPTIONS, QuestionSpec, Variant, load_variant
 from tier2.engine import STATUS_INVALID, STATUS_OK, Decision
 from tier2.vocab import ACTIONS, DIAGNOSES, NO_SERVICE, SERVICES
 
 INCIDENT_THRESHOLD = 0.5
 
-QUESTIONS = {
-    "incident_detected": {
-        "type": "noul",
-        "instructions": "Is there an operational incident in this application right now?",
-        "criteria": {
-            "true": "Yes, something is failing or clearly degraded compared with the baseline.",
-            "false": "No, the application is operating normally.",
-        },
-    },
-    "affected_service": {
-        "type": "choice",
-        "instructions": "Which single service or component is the origin of the problem?",
-        "criteria": {
-            NO_SERVICE: "No service is affected.",
-            **{s: f"The problem originates in {s}." for s in SERVICES},
-        },
-    },
-    "diagnosis": {
-        "type": "choice",
-        "instructions": "What is the most likely failure mode?",
-        "criteria": {
-            "none": "Nothing is wrong.",
-            "application_failure": "The service itself is returning errors.",
-            "latency_degradation": "Requests succeed but are much slower than normal.",
-            "dependency_unreachable": "A service cannot reach something it depends on.",
-            "database_contention": "A database or data store is slow or locked.",
-            "resource_exhaustion": "CPU, memory or capacity is running out.",
-            "unknown": "The evidence is too weak or conflicting to name a failure mode.",
-        },
-    },
-    "recommended_action": {
-        "type": "choice",
-        "instructions": "What single operational action should be taken now?",
-        "criteria": {
-            "no_action": "Take no action. Keep watching.",
-            "investigate": "Look into the cause before changing anything.",
-            "restart_service": "Restart the affected service.",
-            "rollback_change": "Roll back a recent change or configuration.",
-            "scale_up": "Add capacity to the affected service.",
-            "escalate": "Hand the incident to a human on-call engineer immediately.",
-        },
-    },
+# Tier 2's questions: IDs, types and option keys (in the order sent) fixed here;
+# wording from a prompt variant (prompts/tier2/*.yaml). QUESTIONS is the baseline,
+# exactly what was sent before variants existed.
+QUESTION_SCHEMA = {
+    "incident_detected": QuestionSpec("noul", NOUL_OPTIONS),
+    "affected_service": QuestionSpec("choice", (NO_SERVICE, *SERVICES), {"services": SERVICES}),
+    "diagnosis": QuestionSpec("choice", ("none", "application_failure", "latency_degradation",
+                                         "dependency_unreachable", "database_contention",
+                                         "resource_exhaustion", "unknown")),
+    "recommended_action": QuestionSpec("choice", ("no_action", "investigate", "restart_service",
+                                                  "rollback_change", "scale_up", "escalate")),
 }
+assert set(QUESTION_SCHEMA["diagnosis"].options) == set(DIAGNOSES)
+assert set(QUESTION_SCHEMA["recommended_action"].options) == set(ACTIONS)
+
+
+def load_prompt(name: str = DEFAULT_VARIANT) -> Variant:
+    """A Tier 2 prompt variant by name. Raises VariantError for an unknown or bad one."""
+    return load_variant("tier2", name, QUESTION_SCHEMA)
+
+
+QUESTIONS = load_prompt().questions
 
 
 def parse_answers(body: object) -> Decision:

@@ -108,3 +108,14 @@ Same endpoint and question types through `JevClient.send` and `tier3/jev_adapter
 | `recommended_action` | `choice` | 6 options, as in Tier 2. |
 
 In `poll` mode one run makes one request per poll (up to 16 with the default 240 s window and 15 s interval), each with a fresh observation and the identical question set. Every request and raw response is stored in the run record. The observation keeps Tier 2's 60,000-byte budget.
+
+## Prompt variants (jev-prompt-variants, task 1.1)
+
+Checked 2026-11-01 against https://docs.typesafe.ai/api. What a variant can change, and what it cannot:
+
+- `instructions` is optional on every question type. Per the docs it is "the yes/no question or statement to evaluate" (`noul`) or "what the model should decide when choosing an option" (`choice`). The schema accepts a string, an object, an array or `null`.
+- `criteria` shapes the answer. For `noul` it holds the `true` and `false` keys ("what counts as a yes answer" and "what counts as a no answer"). For `choice` it maps each option to a description of "when each applies", 1 to 255 entries. The docs say "a choice without a description is interpreted by its name alone", so option descriptions do reach the model. Values may be a string, an object, an array or `null`.
+- The docs give no character or token limit for `instructions` or `criteria`. The only limits are on counts: 1 to 255 choice options, 1 to 10 score levels, at least one question.
+- There is no request field for context, examples, a system prompt, temperature or reasoning. `assets` (images) and the `TypeSafe-Danger-Zone-Long-Context: true` header exist. The docs do not say what the header changes, and this project uses neither.
+
+So a variant can vary only the `instructions` text and the `criteria` descriptions. The first version of the loader accepts strings only. Objects and arrays are allowed by the API, but nothing here needs them yet.

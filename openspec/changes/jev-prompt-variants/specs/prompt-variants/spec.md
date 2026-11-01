@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Variant files
-A prompt variant SHALL be one YAML file at `prompts/<tier>/<name>.yaml` with `name`, `version` (a positive integer), `tier` (`tier1`, `tier2` or `tier3`), `rationale`, `dev_records` (the records it was written against) and `questions`. For each question, `questions` SHALL hold `instructions` and either `criteria` (text for every option) or a per-option `criteria_template`. Tier 4 SHALL use the `tier3` variants.
+A prompt variant SHALL be one YAML file at `prompts/<tier>/<name>.yaml` with `name`, `version` (a positive integer), `tier` (`tier1`, `tier2` or `tier3`), `rationale`, `dev_records` (the records it was written against) and `questions`. For each question, `questions` SHALL hold `instructions` and either `criteria` (text for every option) or a per-option `criteria_templates`. Tier 4 SHALL use the `tier3` variants.
 
 #### Scenario: Valid variant loads
 - **WHEN** `prompts/tier3/strict-incident.yaml` gives text for every Tier 3 question and option

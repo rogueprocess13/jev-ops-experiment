@@ -17,6 +17,7 @@ from typing import Callable
 
 import requests
 
+from prompts.loader import DEFAULT_VARIANT, NOUL_OPTIONS, QuestionSpec, Variant, load_variant
 from scenarios.definitions import ACTIONS, CAUSES, HUMAN_REVIEW, SEVERITIES
 
 DEFAULT_URL = "https://api.typesafe.ai/v1/systemone"
@@ -29,49 +30,23 @@ STATUS_OK = "ok"
 STATUS_INVALID = "invalid"
 STATUS_ERROR = "error"
 
-QUESTIONS = {
-    "severity": {
-        "type": "choice",
-        "instructions": "How severe is the current condition of this server?",
-        "criteria": {
-            "normal": "Operating normally. No sign of a problem.",
-            "degraded": "Minor or uncertain signs of trouble. Service still works.",
-            "high": "Clear service impairment. Users are likely affected.",
-            "critical": "Severe failure or imminent failure. Service is down or close to it.",
-        },
-    },
-    "action": {
-        "type": "choice",
-        "instructions": "What single operational action should be taken now?",
-        "criteria": {
-            "observe": "Take no action. Keep watching.",
-            "investigate": "Look into the cause before changing anything.",
-            "restart": "Restart the affected service.",
-            "escalate": "Hand the incident to a human on-call engineer immediately.",
-        },
-    },
-    "probable_cause": {
-        "type": "choice",
-        "instructions": "What is the most likely cause of the current condition?",
-        "criteria": {
-            "none": "Nothing is wrong.",
-            "resource_exhaustion": "CPU, memory, disk or capacity is running out.",
-            "dependency_failure": "A service this one depends on is failing or unreachable.",
-            "application_bug": "A defect in the application code.",
-            "configuration": "A wrong or changed configuration setting.",
-            "network": "Network connectivity or packet loss.",
-            "unknown": "The evidence is too weak or conflicting to name a cause.",
-        },
-    },
-    "human_review": {
-        "type": "noul",
-        "instructions": "Should a human review this situation before any action is taken?",
-        "criteria": {
-            "true": "A human should review it.",
-            "false": "No human review is needed.",
-        },
-    },
+# Tier 1's questions: IDs, types and option keys fixed here; wording from a prompt
+# variant (prompts/tier1/*.yaml). QUESTIONS is the baseline, exactly what was sent
+# before variants existed (tests/fixtures/questions-tier1-pre-variants.json).
+QUESTION_SCHEMA = {
+    "severity": QuestionSpec("choice", SEVERITIES),
+    "action": QuestionSpec("choice", ACTIONS),
+    "probable_cause": QuestionSpec("choice", CAUSES),
+    "human_review": QuestionSpec("noul", NOUL_OPTIONS),
 }
+
+
+def load_prompt(name: str = DEFAULT_VARIANT) -> Variant:
+    """A Tier 1 prompt variant by name. Raises VariantError for an unknown or bad one."""
+    return load_variant("tier1", name, QUESTION_SCHEMA)
+
+
+QUESTIONS = load_prompt().questions
 
 
 class ConfigError(RuntimeError):

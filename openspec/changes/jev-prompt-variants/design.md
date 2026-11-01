@@ -48,7 +48,10 @@ questions:
       "false": "..."
   affected_component:
     instructions: "..."
-    criteria_template: "The problem originates in {option}."   # per-option text for long vocabularies
+    criteria: {none: "Nothing is affected."}
+    criteria_templates:                      # one text per named group of options
+      services: "The problem originates in {option}."
+      nodes: "The problem originates in node {option}."
   diagnosis: {instructions: "...", criteria: {none: "...", ...}}
   recommended_action: {instructions: "...", criteria: {...}}
 ```

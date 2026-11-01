@@ -1,14 +1,14 @@
 ## 1. Check the API before coding against it
 
-- [ ] 1.1 Re-read https://docs.typesafe.ai/api for `instructions` and `criteria`: length limits, whether option descriptions are used by the model, and any other request field that affects the answer. Record it in `docs/jev-api-notes.md` (a "Prompt variants" section). Do not guess parameters
-- [ ] 1.2 Freeze today's three question sets as JSON fixtures (`tests/fixtures/questions-tier{1,2,3}-pre-variants.json`), from the current constants, before any refactor
+- [x] 1.1 Re-read https://docs.typesafe.ai/api for `instructions` and `criteria`: length limits, whether option descriptions are used by the model, and any other request field that affects the answer. Record it in `docs/jev-api-notes.md` (a "Prompt variants" section). Do not guess parameters (2026-11-01: only `instructions` and `criteria` text can vary; no length limits documented; no context, example, system or temperature fields; option descriptions reach the model)
+- [x] 1.2 Freeze today's three question sets as JSON fixtures (`tests/fixtures/questions-tier{1,2,3}-pre-variants.json`), from the current constants, before any refactor
 
 ## 2. Variant loader and baseline
 
-- [ ] 2.1 `prompts/loader.py`: load `prompts/<tier>/<name>.yaml`, validate against the tier's question IDs, types and option keys (D1), build the question dict, and compute `sha256` over canonical JSON (D3). List the variants for each tier
-- [ ] 2.2 `prompts/tier1/baseline.yaml`, `prompts/tier2/baseline.yaml`, `prompts/tier3/baseline.yaml` with today's text (Tier 3 component and node text as `criteria_template`)
-- [ ] 2.3 Build `jev/client.py`, `tier2/jev_adapter.py` and `tier3/questions.py` `QUESTIONS` from `baseline`. Keep the parsers unchanged
-- [ ] 2.4 Offline tests: baseline equals the frozen fixtures byte for byte; each loader rejection (missing or extra question, missing or extra option, `type` key, name/file mismatch, bad version); hash stability
+- [x] 2.1 `prompts/loader.py`: load `prompts/<tier>/<name>.yaml`, validate against the tier's question IDs, types and option keys (D1), build the question dict, and compute `sha256` over canonical JSON (D3). List the variants for each tier
+- [x] 2.2 `prompts/tier1/baseline.yaml`, `prompts/tier2/baseline.yaml`, `prompts/tier3/baseline.yaml` with today's text (Tier 3 component and node text as `criteria_templates`)
+- [x] 2.3 Build `jev/client.py`, `tier2/jev_adapter.py` and `tier3/questions.py` `QUESTIONS` from `baseline`. Keep the parsers unchanged (also `COPY prompts` in the Dockerfile)
+- [x] 2.4 Offline tests: baseline equals the frozen fixtures byte for byte; each loader rejection (missing or extra question, missing or extra option, `type` key, name/file mismatch, bad version); hash stability
 
 ## 3. Selecting and recording a variant
 
