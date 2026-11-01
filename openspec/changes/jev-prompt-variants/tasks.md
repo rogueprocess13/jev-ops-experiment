@@ -43,10 +43,10 @@
 ## 7. Live comparison (real Jev calls)
 
 - [x] 7.1 Tier 1: run 70 runs with `--seed 1000` for each variant (dev), then 70 runs with `--seed 2000` for `baseline` and each variant (confirm) (2026-11-01, Jev API, jev-1.14.0, v3 variants: dev `results/20261101-182029-70runs-prompt-strict-incident.jsonl`, `...182055-...-evidence-options.jsonl`; confirm `...182121-70runs.jsonl` (baseline), `...182146-...-strict-incident.jsonl`, `...182212-...-evidence-options.jsonl`. 350 calls, 0 errors, 0 invalid, $0.0222 estimated. The dev baseline `20261018-134025-70runs.jsonl` was answered by jev-1.13.0, so dev comparisons against it mix a model change)
-- [ ] 7.2 Tier 2: replay `baseline` and each variant on both Tier 2 directories
-- [ ] 7.3 Tier 3/4: replay `baseline` and each variant on `results/tier3/10.3-combined` (dev) and `results/tier4/6.2-combined` (confirm)
-- [ ] 7.4 Optional: if a variant clearly beats baseline on the confirm set, run one live Tier 3 batch with it (`./run-all-k8s-experiments --prompt <name>`) to check it without censoring and with real MTTD
-- [ ] 7.5 Write `docs/results-<date>-prompt-variants.md`: confirm tables first, censoring and sample-size limits, what changed and what did not. Every figure comes from the records
+- [x] 7.2 Tier 2: replay `baseline` and each variant on both Tier 2 directories (2026-11-01, jev-1.14.0: dev `20261012-190447-369b` (6 runs), confirm `20261012-195728-7983` (18 runs); replays `results/tier2/replay/20261101-1626*`, 72 calls, all ok; report `results/tier2/20261101-prompt-variants-compare.md`. A fresh Tier 1 dev baseline on jev-1.14.0 is `results/20261101-182620-70runs.jsonl`)
+- [x] 7.3 Tier 3/4: replay `baseline` and each variant on `results/tier3/10.3-combined` (dev) and `results/tier4/6.2-combined` (confirm) (2026-11-01, jev-1.14.0: replays `results/tier3/replay/20261101-16*`, 1,893 calls, 0 invalid, 0 censored; report `results/tier3/20261101-prompt-variants-compare.md`)
+- [x] 7.4 Optional: if a variant clearly beats baseline on the confirm set, run one live Tier 3 batch with it (`./run-all-k8s-experiments --prompt <name>`) to check it without censoring and with real MTTD (2026-11-01: not run. No variant clearly beats baseline on the confirm set: evidence-options gains RCA 3/18 but loses diagnosis 2/18; strict-incident changes no detection)
+- [x] 7.5 Write `docs/results-<date>-prompt-variants.md`: confirm tables first, censoring and sample-size limits, what changed and what did not. Every figure comes from the records (`docs/results-2026-11-01-prompt-variants.md`)
 
 ## 8. Docs and rules
 
