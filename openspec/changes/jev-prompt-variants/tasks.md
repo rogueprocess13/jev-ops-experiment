@@ -37,7 +37,7 @@
 ## 6. Candidate variants
 
 - [x] 6.1 Read the dev-set records (Tier 1 seed 1000; Tier 2 `20261012-190447-369b`; Tier 3 `10.3-combined`), the false alarms first, and write a short note of what the baseline wording gets wrong (`docs/prompt-variants-dev-notes.md`, 2026-11-01. The open question was decided by the user the same day: policy text is allowed in general terms, marked `style: policy` and labelled in the reports, design D10)
-- [ ] 6.2 Write `strict-incident` and `evidence-options` for each tier, by hand, with `rationale` and `dev_records` (D8). No scenario-specific rules (D9)
+- [x] 6.2 Write `strict-incident` and `evidence-options` for each tier, by hand, with `rationale` and `dev_records` (D8). No scenario-specific rules (D9) (2026-11-01: six files. `strict-incident` is `style: policy` and changes only the incident question (Tiers 2/3) or the human-review question (Tier 1); `evidence-options` is `style: wording` and changes only option descriptions: components and diagnoses (Tiers 2/3), severity and cause (Tier 1). Questions not named keep the baseline text exactly)
 - [ ] 6.3 Have someone other than the author review the variants for hints and leaks before any live call, and record the review in the variant's commit message
 
 ## 7. Live comparison (real Jev calls)

@@ -1,0 +1,44 @@
+# Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
+# docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
+name: strict-incident
+version: 1
+tier: tier1
+style: policy
+rationale: 'Policy stated. Only the human-review question changes. Dev notes finding 4: the baseline asks
+  for review on routine, contained cases (investigate a clear cause, a standard restart), because the
+  question gives no rule for when review is needed. This states that rule in general operational terms.
+  Severity, action and cause wording are the baseline''s.'
+dev_records:
+- results/20261018-134025-70runs.jsonl
+questions:
+  severity:
+    instructions: How severe is the current condition of this server?
+    criteria:
+      normal: Operating normally. No sign of a problem.
+      degraded: Minor or uncertain signs of trouble. Service still works.
+      high: Clear service impairment. Users are likely affected.
+      critical: Severe failure or imminent failure. Service is down or close to it.
+  action:
+    instructions: What single operational action should be taken now?
+    criteria:
+      observe: Take no action. Keep watching.
+      investigate: Look into the cause before changing anything.
+      restart: Restart the affected service.
+      escalate: Hand the incident to a human on-call engineer immediately.
+  probable_cause:
+    instructions: What is the most likely cause of the current condition?
+    criteria:
+      none: Nothing is wrong.
+      resource_exhaustion: CPU, memory, disk or capacity is running out.
+      dependency_failure: A service this one depends on is failing or unreachable.
+      application_bug: A defect in the application code.
+      configuration: A wrong or changed configuration setting.
+      network: Network connectivity or packet loss.
+      unknown: The evidence is too weak or conflicting to name a cause.
+  human_review:
+    instructions: Should a person review this situation before any action is taken?
+    criteria:
+      'true': Yes, when the evidence is weak, mixed or does not fit together; when the failure is severe
+        or spreading; or when the likely fix is risky or more than a standard restart.
+      'false': 'No, when the problem is contained and the next step is routine: keep watching, look into
+        a clear cause, or apply a standard low-risk restart.'

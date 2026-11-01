@@ -117,7 +117,7 @@ These are hand-written per tier, each with a rationale in its file:
 
 - `baseline`: today's text.
 - `strict-incident`: the incident (Tiers 2/3) and human-review (Tier 1) questions require a clear change against the baseline window that affects users or availability. Small fluctuations are described as normal. Aimed at the false alarms in `docs/results-2026-11-01-precision-recall-f1.md`.
-- `evidence-options`: every option description says what would be seen in the observation if that option were right. For example, `scale_up`: "the service has fewer available instances than its baseline". The text stays general. It names no scenario, fault or experiment term (D9).
+- `evidence-options`: option descriptions say what would be seen in the observation if that option were right (as written in task 6.2: the component, diagnosis, severity and cause options; the action and human-review texts stay the baseline's, so a change in action scores cannot come from reworded actions). For example, `scale_up`: "the service has fewer available instances than its baseline". The text stays general. It names no scenario, fault or experiment term (D9).
 
 More variants are added the same way. Each new one needs a rationale and a version.
 

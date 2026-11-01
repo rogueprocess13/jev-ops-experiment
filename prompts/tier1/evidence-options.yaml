@@ -1,0 +1,48 @@
+# Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
+# docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
+name: evidence-options
+version: 1
+tier: tier1
+style: wording
+rationale: 'Wording only. Severity and cause options describe what each looks like in the observation.
+  Dev notes finding 5: the baseline names a specific cause where the evidence supports none, so `unknown`
+  is described as the answer for weak or mixed signals. Questions, action and human-review wording are
+  the baseline''s.'
+dev_records:
+- results/20261018-134025-70runs.jsonl
+questions:
+  severity:
+    instructions: How severe is the current condition of this server?
+    criteria:
+      normal: Metrics, service statuses and logs are within their normal ranges. No sign of a problem.
+      degraded: Some signals are worse than normal, or the evidence is weak, but the service still works
+        for its users.
+      high: 'Clear impairment that users would notice: errors, time-outs or slowness, or one part of the
+        service has stopped doing its work.'
+      critical: 'The service is down or about to fail: very high error rates, an outage, or resources
+        at their limit.'
+  action:
+    instructions: What single operational action should be taken now?
+    criteria:
+      observe: Take no action. Keep watching.
+      investigate: Look into the cause before changing anything.
+      restart: Restart the affected service.
+      escalate: Hand the incident to a human on-call engineer immediately.
+  probable_cause:
+    instructions: What is the most likely cause of the current condition?
+    criteria:
+      none: Nothing is wrong.
+      resource_exhaustion: CPU, memory, disk or another capacity limit of this server is close to full,
+        and the problems grow with it.
+      dependency_failure: Calls from this server to another service fail or time out, while this server's
+        own resources are fine.
+      application_bug: Errors come from the application's own code, for example repeated exceptions in
+        the logs, while resources and dependencies are fine.
+      configuration: A setting is wrong or was changed, and the errors start right after the change.
+      network: Connections between machines drop, time out or lose packets.
+      unknown: The signals are weak, mixed or point to different causes. Choose this rather than guessing.
+  human_review:
+    instructions: Should a human review this situation before any action is taken?
+    criteria:
+      'true': A human should review it.
+      'false': No human review is needed.
