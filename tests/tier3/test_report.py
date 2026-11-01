@@ -66,7 +66,21 @@ def test_scorecard_counts_with_denominators():
     assert data["mttd"]["median"] == 53.5 and (data["mttd"]["min"], data["mttd"]["max"]) == (47, 60)
     assert data["false_positive_runs"] == (1, 2) and data["false_positive_polls"] == (1, 16)
     assert data["detection_precision"] == (2, 3)
+    assert data["detection_recall"] == (2, 2)
+    assert data["detection_f1"] == (4, 5)  # 2TP / (2TP + FP + FN) = 4 / (4 + 1 + 0)
+    assert data["detection_confusion"] == {"tp": 2, "fn": 0, "fp": 1, "tn": 1}
     assert data["cost_usd"] is None and data["input_tokens"] == 8000
+
+
+def test_detection_recall_and_f1_count_missed_fault_runs():
+    missed = record(run_id="r3", decision=ok_decision(**QUIET), detected_at=None)
+    data = scorecard_data([record(), missed, control(0)])["overall"]
+    assert data["detection_recall"] == (1, 2)
+    assert data["detection_f1"] == (2, 3)  # 2 / (2 + 0 + 1)
+    assert data["detection_confusion"] == {"tp": 1, "fn": 1, "fp": 0, "tn": 1}
+    text = format_scorecard([record(), missed, control(0)])
+    assert "Detection recall (detected fault runs / fault runs): 1/2" in text
+    assert "Detection F1 (2TP / (2TP + FP + FN)): 2/3 (0.67)" in text
 
 
 def test_scorecard_text_has_unmeasured_rows_and_no_percentages():

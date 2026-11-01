@@ -55,6 +55,7 @@ def _block(recs: list[dict]) -> dict:
     fp = [r["false_positive"] for r in controls if r.get("false_positive")]
     fp_runs = sum(1 for f in fp if f["false_positive_run"])
     det_faults = sum(1 for r in faults if _detected(r))
+    missed = len(faults) - det_faults
     polls = [p for r in recs for p in r.get("polls", [])]
     return {
         "runs": len(recs), "runs_ok": len(ok),
@@ -71,6 +72,12 @@ def _block(recs: list[dict]) -> dict:
         "false_positive_polls": (sum(f["false_positive_polls"] for f in fp),
                                  sum(f["answered_polls"] for f in fp)),
         "detection_precision": (det_faults, det_faults + fp_runs),
+        # Run-level binary detection: a fault run is positive, a no-incident run negative.
+        # F1 = 2TP / (2TP + FP + FN), kept as a fraction like every other count here.
+        "detection_recall": (det_faults, len(faults)),
+        "detection_f1": (2 * det_faults, 2 * det_faults + fp_runs + missed),
+        "detection_confusion": {"tp": det_faults, "fn": missed, "fp": fp_runs,
+                                "tn": len(fp) - fp_runs},
         "agent_errors": (sum(1 for p in polls if p["decision"]["status"] == "error"), len(polls)),
         "invalid_replies": (sum(1 for p in polls if p["decision"]["status"] == "invalid"), len(polls)),
         "engine_calls": sum(r["usage"]["engine_calls"] for r in recs),
@@ -91,6 +98,11 @@ def scorecard_data(records: list[dict]) -> dict:
 def _frac(pair) -> str:
     a, b = pair
     return f"{a}/{b}" if b else "n/a"
+
+
+def _dec(pair) -> str:
+    a, b = pair
+    return f" ({a / b:.2f})" if b else ""
 
 
 def _num(x, unit="") -> str:
@@ -120,6 +132,9 @@ def format_scorecard(records: list[dict]) -> str:
         "",
         f"Detection precision (detected fault runs / (detected fault runs + false-positive control runs)): "
         f"{_frac(o['detection_precision'])}",
+        f"Detection recall (detected fault runs / fault runs): {_frac(o['detection_recall'])}",
+        f"Detection F1 (2TP / (2TP + FP + FN)): {_frac(o['detection_f1'])}{_dec(o['detection_f1'])}",
+        "Detection confusion (runs): TP {tp}, FN {fn}, FP {fp}, TN {tn}.".format(**o["detection_confusion"]),
         f"Invalid replies: {_frac(o['invalid_replies'])} polls. Runs with errors: {o['runs_error']}, "
         f"contaminated: {o['runs_contaminated']}.",
         engines_line(records),
