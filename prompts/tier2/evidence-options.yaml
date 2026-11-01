@@ -1,18 +1,21 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
 # v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
+# v3 (2026-11-01): changed after the second task 6.3 review, before any record used v2.
 name: evidence-options
-version: 2
+version: 3
 tier: tier2
 style: wording
 rationale: 'Wording only. Service and diagnosis options describe what each looks like. Dev notes finding
   3: the baseline names the caller that reports the errors instead of the service that failed, so the
-  service options say the failure starts in that service itself. Risk, cuts both ways: in some faults
-  the expected origin is the caller that reports the errors or slowness from below (F004, F006), so
-  "not when it only reports errors from a service it calls" may lower localization there while raising
-  it on F003; read a localization drop on those as this trade-off, not a surprise. v2: dropped "Choose
-  this rather than guessing" from `unknown` (a decision bias, so policy, not wording). Questions and
-  action wording are the baseline''s.'
+  service options say where the failure starts. v2: dropped "Choose this rather than guessing" from
+  `unknown` (a decision bias, so policy, not wording). v3: v2''s "not when it only reports errors or
+  slowness from a service it calls" made the expected origin look wrong where it is the caller (F004,
+  F006) and contradicted `dependency_unreachable` ("the caller reports the errors"). The service text now
+  counts a service''s own broken connection as its own failure and excludes only errors passed on from
+  below; `dependency_unreachable` describes a failed connection, so it overlaps `database_contention`
+  less. Remaining risk: a model may still read the exclusion too widely and name the callee on F004 or
+  F006. Questions and action wording are the baseline''s.'
 dev_records:
 - results/tier2/20261012-190447-369b
 questions:
@@ -26,8 +29,8 @@ questions:
     criteria:
       none: No service is failing.
     criteria_templates:
-      services: 'The failure starts in {option} itself: {option} is unavailable, or fails or slows down
-        on its own work. Not when {option} only reports errors or slowness from a service it calls.'
+      services: 'The failure starts in {option}: its own work fails or slows down, or its own connection
+        to a dependency is broken. Not when {option} only passes on errors that a service it calls returns.'
   diagnosis:
     instructions: What is the most likely failure mode?
     criteria:
@@ -36,8 +39,8 @@ questions:
         working.
       latency_degradation: Requests succeed but take much longer than in the baseline window, with few
         or no errors.
-      dependency_unreachable: A service's calls to another service or data store fail or time out. The
-        caller reports the errors.
+      dependency_unreachable: A service cannot connect to another service or data store (connection refused,
+        wrong address, no route).
       database_contention: A database or data store answers slowly, or with lock or time-out errors.
       resource_exhaustion: A service runs out of CPU, memory or capacity, so it slows down or fails under
         its normal load.

@@ -1,8 +1,9 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
 # v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
+# v3 (2026-11-01): changed after the second task 6.3 review, before any record used v2.
 name: evidence-options
-version: 2
+version: 3
 tier: tier1
 style: wording
 rationale: 'Wording only. Severity and cause options describe what each looks like in the observation.
@@ -11,6 +12,11 @@ rationale: 'Wording only. Severity and cause options describe what each looks li
   `unknown` (a decision bias, so policy, not wording); "one part of the service has stopped doing its
   work" (a paraphrase of one case) became "a component is failing or stalled"; "or resources at their
   limit" left `critical`, as it could push a high-resource case with contradictory signals to critical.
+  v3: `configuration` said "the errors start right after the change", which also fits a code deploy
+  followed by errors (expected application_bug); it now separates a setting from the code. Remaining
+  risks, not changed: "close to full" may not fit moderate resource use, and "while this server''s own
+  resources are fine" may pull such a case toward dependency_failure; a case with a service down but
+  contradictory signals may still read as high or critical rather than degraded, as with the baseline.
   Questions, action and human-review wording are the baseline''s.'
 dev_records:
 - results/20261018-134025-70runs.jsonl
@@ -41,7 +47,8 @@ questions:
         own resources are fine.
       application_bug: Errors come from the application's own code, for example repeated exceptions in
         the logs, while resources and dependencies are fine.
-      configuration: A setting is wrong or was changed, and the errors start right after the change.
+      configuration: A configuration setting, not the code, is wrong or was changed, and the errors point
+        to that setting.
       network: Connections between machines drop, time out or lose packets.
       unknown: The signals are weak, mixed or point to different causes.
   human_review:

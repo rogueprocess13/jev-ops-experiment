@@ -1,8 +1,9 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
 # v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
+# v3 (2026-11-01): changed after the second task 6.3 review, before any record used v2.
 name: strict-incident
-version: 2
+version: 3
 tier: tier1
 style: policy
 rationale: 'Policy stated. Only the human-review question changes. Dev notes finding 4: the baseline asks
@@ -10,8 +11,11 @@ rationale: 'Policy stated. Only the human-review question changes. Dev notes fin
   This states one general rule: review when the diagnosis is not certain or the fix is more than a routine,
   reversible step. v2: v1 listed clauses that mapped almost one to one onto the Tier 1 cases, some in
   their own wording, and its "look into a clear cause" clause contradicted a case whose expected answer
-  is yes; the review judged it fitted to the test set. Severity, action and cause wording are the
-  baseline''s.'
+  is yes; the review judged it fitted to the test set. v3: text unchanged; risks recorded from the
+  second review. A case with a named cause and a routine investigate step but an expected yes
+  (log_only_errors) may read as no under this rule; a case whose expected action is investigate but
+  expected review is no (degraded) may read as yes, since investigating suggests the cause is not
+  certain. Severity, action and cause wording are the baseline''s.'
 dev_records:
 - results/20261018-134025-70runs.jsonl
 questions:

@@ -1,15 +1,22 @@
 # Hand-written candidate variant (jev-prompt-variants task 6.2, 2026-11-01), from
 # docs/prompt-variants-dev-notes.md. Never edit in place: bump `version` or add a variant.
 # v2 (2026-11-01): changed after the task 6.3 review, before any record used v1.
+# v3 (2026-11-01): changed after the second task 6.3 review, before any record used v2.
 name: evidence-options
-version: 2
+version: 3
 tier: tier3
 style: wording
 rationale: 'Wording only. Component and diagnosis options describe what each looks like. Dev notes finding
   3: the baseline names frontend or frontend-proxy when a dependency has no available instances or a node
   was evicted, so component options say the failure starts in that component itself. Questions and action
   wording are the baseline''s. v2: dropped "Choose this rather than guessing" from `unknown` (a decision
-  bias, so policy, not wording).'
+  bias, so policy, not wording). v3: the service text also counts instances that are not ready or keep
+  restarting (a stuck rollout whose old instance still serves had no matching text, K005), and
+  `misconfiguration` lost "often right after a change", which pulled a bad memory limit or readiness
+  probe (K003, K005) toward it. Remaining risks: `pod_restart` ("the replacements are running") also
+  fits a node whose workloads moved elsewhere (K009, expected node_eviction); the exclusion "only
+  reports errors from something it calls" may still push away from a caller that is the expected
+  origin.'
 dev_records:
 - results/tier3/10.3-combined
 questions:
@@ -24,8 +31,8 @@ questions:
       none: Nothing is affected.
     criteria_templates:
       services: 'The failure starts in {option} itself: {option} has fewer working instances than its
-        baseline, or fails or slows down on its own work. Not when {option} only reports errors from something
-        it calls.'
+        baseline, its new or existing instances are not ready or keep restarting, or it fails or slows down
+        on its own work. Not when {option} only reports errors from something it calls.'
       nodes: 'The failure starts at node {option}: workloads on it were evicted or stopped, or cannot
         run there.'
   diagnosis:
@@ -39,8 +46,7 @@ questions:
       network_blocked: Instances are running and ready, but traffic to or from the service does not get
         through. Callers see connection failures or time-outs.
       readiness_failure: Instances are running but not ready, so they receive no traffic.
-      misconfiguration: Instances start but fail or behave wrongly because of a bad setting, often right
-        after a change.
+      misconfiguration: Instances start but fail or behave wrongly because of a bad setting.
       node_eviction: Workloads were evicted from a node and are pending or have moved to other nodes.
       disk_full: A disk or filesystem is full, so writes fail.
       overload: A service receives more requests than its instances can handle, so latency and errors
