@@ -73,6 +73,8 @@ def main(argv=None) -> int:
                       ("export-lfedge", "write JSONL in the LF Edge harness's field names")):
         p = sub.add_parser(name, help=hlp)
         p.add_argument("results")
+        p.add_argument("--include-replay", action="store_true",
+                       help="also read replay records (left out by default; replay has no remediation)")
         if name != "scorecard":
             p.add_argument("-o", "--output")
     args = ap.parse_args(argv)
@@ -83,7 +85,7 @@ def main(argv=None) -> int:
         return 0
     if args.cmd in ("scorecard", "export-lfedge"):
         from tier4.report import export_lfedge, format_scorecard, load_records
-        recs = load_records(args.results)
+        recs = load_records(args.results, include_replay=args.include_replay)
         if args.cmd == "scorecard":
             print(format_scorecard(recs))
         else:

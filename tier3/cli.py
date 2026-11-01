@@ -123,6 +123,36 @@ def _write(text: str, out: str | None) -> None:
         sys.stdout.write(text)
 
 
+def _note_replay(path, included: bool) -> None:
+    from tier3.replay import load_sources
+    from tier3.report import load_records
+    if included:
+        return
+    n = len(load_records(path, include_replay=True)) - len(load_sources(path))
+    if n:
+        print(f"note: {n} replay record(s) left out; add --include-replay to read them", file=sys.stderr)
+
+
+def _replay(args) -> int:
+    from tier3.replay import load_sources, plan, replay_batch
+    from tier3.report import format_scorecard
+    p = plan(load_sources(args.records))
+    print(f"replay {len(p['replay'])} record(s), {p['engine_calls']} engine call(s), "
+          f"engine {args.engine}, prompt {args.prompt}; skipped {len(p['skipped'])}", flush=True)
+    for s in p["skipped"]:
+        print(f"  skipped {s['path']}: {s['reason']} ({s['status']})")
+    if args.dry_run or not p["replay"]:
+        return 0 if p["replay"] or args.dry_run else 1
+    engine = build_engine(args.engine, args.prompt_variant)
+    summary = replay_batch(args.records, engine, args.results_dir)
+    d = Path(args.results_dir) / "replay" / summary["run_id"]
+    from tier3.report import load_records
+    print(format_scorecard(load_records(d, include_replay=True)))
+    print(f"censored runs: {summary['censored']}/{summary['replayed']}")
+    print(f"result: {d}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="tier3", description="Tier 3: Kubernetes faults on kind")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -144,8 +174,19 @@ def main(argv=None) -> int:
                       ("export-reasoning", "write a Markdown sheet for hand scoring")):
         p = sub.add_parser(name, help=hlp)
         p.add_argument("results")
+        p.add_argument("--include-replay", action="store_true",
+                       help="also read replay records (left out by default)")
         if name != "scorecard":
             p.add_argument("-o", "--output")
+    rp = sub.add_parser("replay", help="re-ask stored Tier 3/4 observations under a prompt variant "
+                                       "(no cluster; calls the engine once per stored poll)")
+    rp.add_argument("records", help="a run record, a run directory, or a parent of several")
+    rp.add_argument("--engine", choices=ENGINES, default="jev")
+    add_prompt_arg(rp)
+    rp.add_argument("--results-dir", default=str(DEFAULT_RESULTS),
+                    help="replay records go to <results-dir>/replay/<run-id>/")
+    rp.add_argument("--dry-run", action="store_true",
+                    help="print what would be replayed and how many engine calls, then stop")
     args = ap.parse_args(argv)
     resolve_prompt(ap, args)
 
@@ -154,7 +195,8 @@ def main(argv=None) -> int:
         return 0
     if args.cmd in ("scorecard", "export-lfedge", "export-reasoning"):
         from tier3.report import export_lfedge, export_reasoning, format_scorecard, load_records
-        recs = load_records(args.results)
+        recs = load_records(args.results, include_replay=args.include_replay)
+        _note_replay(args.results, args.include_replay)
         if args.cmd == "scorecard":
             print(format_scorecard(recs))
         elif args.cmd == "export-lfedge":
@@ -162,6 +204,8 @@ def main(argv=None) -> int:
         else:
             _write(export_reasoning(recs), args.output)
         return 0
+    if args.cmd == "replay":
+        return _replay(args)
     if args.cmd == "health":
         c = _clients()
         checks = testbed.run_checks(c["kube"], c["prom"], c["jaeger"], c["workload"], c["injector"])

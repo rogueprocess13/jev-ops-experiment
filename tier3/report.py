@@ -17,8 +17,10 @@ from tier3.evaluate import PASS, UNKNOWN
 NOT_MEASURED = "not measured (recommendation only)"
 
 
-def load_records(path: str | Path) -> list[dict]:
-    """Every run record under `path` (a run directory or a parent of several)."""
+def load_records(path: str | Path, include_replay: bool = False) -> list[dict]:
+    """Every run record under `path` (a run directory or a parent of several). Replay
+    records (`mode: replay`) are left out unless asked for: live scorecards never mix
+    them in by accident."""
     path = Path(path)
     files = [path] if path.is_file() else sorted(path.rglob("*.json"))
     out = []
@@ -27,6 +29,8 @@ def load_records(path: str | Path) -> list[dict]:
             continue
         rec = json.loads(f.read_text())
         if isinstance(rec, dict) and "experiment_id" in rec and "polls" in rec:
+            if rec.get("mode") == "replay" and not include_replay:
+                continue
             out.append(rec)
     return out
 

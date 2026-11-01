@@ -13,6 +13,15 @@ from tier2.scenarios import ScenarioError, format_list, get_scenario, load_all
 DEFAULT_RESULTS = Path("results") / "tier2"
 
 
+def build_engine(prompt=None):
+    """The Jev adapter asking the given variant. Raises SystemExit on a configuration error."""
+    from tier2.jev_adapter import ConfigError, JevAdapter
+    try:
+        return JevAdapter(prompt=prompt)
+    except ConfigError as e:
+        raise SystemExit(f"error: {e}")
+
+
 def build_deps(prompt=None):
     from tier2.collect import collect
     from tier2.collectors.jaeger import Jaeger
@@ -70,7 +79,12 @@ def main(argv=None) -> int:
     r.add_argument("experiment_id")
     a = sub.add_parser("run-all", help="run the whole catalogue")
     a.add_argument("--repeats", type=int, default=1)
-    for p in (r, a):
+    rp = sub.add_parser("replay", help="re-ask stored Tier 2 observations under a prompt variant "
+                                       "(no Docker; one engine call per record)")
+    rp.add_argument("records", help="a run record, a run directory, or a parent of several")
+    rp.add_argument("--dry-run", action="store_true",
+                    help="print what would be replayed and how many engine calls, then stop")
+    for p in (r, a, rp):
         p.add_argument("--results-dir", default=str(DEFAULT_RESULTS))
         p.add_argument("--prompt", default=DEFAULT_VARIANT,
                        help=f"prompt variant (prompts/tier2/*.yaml): {', '.join(list_variants('tier2'))} "
@@ -96,6 +110,21 @@ def main(argv=None) -> int:
         from tier2.faults import HttpFlagStore, reset_faults
         changed = reset_faults(HttpFlagStore(testbed.base_url()))
         print("reset: " + (", ".join(changed) if changed else "nothing to change"))
+        return 0
+
+    if args.cmd == "replay":
+        from tier2.replay import load_sources, plan, replay_batch
+        pl = plan(load_sources(args.records))
+        print(f"replay {len(pl['replay'])} record(s), {pl['engine_calls']} engine call(s), "
+              f"prompt {args.prompt}; skipped {len(pl['skipped'])}", flush=True)
+        for sk in pl["skipped"]:
+            print(f"  skipped {sk['path']}: {sk['reason']} ({sk['status']})")
+        if args.dry_run or not pl["replay"]:
+            return 0 if pl["replay"] or args.dry_run else 1
+        engine = build_engine(prompt)
+        summary = replay_batch(args.records, engine, args.results_dir)
+        print(json.dumps(summary["aggregate"], indent=2))
+        print(f"result: {Path(args.results_dir) / 'replay' / summary['run_id']}")
         return 0
 
     from tier2.runner import new_run_id, run_batch, run_experiment

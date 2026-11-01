@@ -25,12 +25,20 @@ Tier 3/4 replay SHALL score the first stored poll whose answer reports an incide
 - **WHEN** a control record has 15 stored polls and the variant reports an incident at polls 9 and 12 only
 - **THEN** all 15 polls are asked, poll 9 is scored, and the run is a false-positive run with 2 false-positive polls out of 15
 
-### Requirement: Censored fault runs
-A fault record that stores fewer polls than its live window, where the variant reports no incident on any stored poll, SHALL be marked `censored: true`. It SHALL count as not detected on the stored polls. Reports SHALL show the censored count beside recall, and SHALL NOT call these runs confirmed misses.
+### Requirement: Censored runs
+A source record is truncated when its first detecting poll is its last stored poll (live polling stopped there). When the variant reports no incident on any stored poll of a truncated source, the replay record SHALL be marked `censored: true`. A censored fault run SHALL count as not detected on the stored polls, and a censored no-incident run as no false positive on the stored polls. Reports SHALL show the censored count, and SHALL NOT call these runs confirmed misses or confirmed true negatives. A source that never detected stored its whole window and SHALL NOT be censored.
 
 #### Scenario: Stricter variant on a one-poll fault run
-- **WHEN** a K001 record stored one poll and the variant answers no incident on it
+- **WHEN** a K001 record stored one poll, which detected, and the variant answers no incident on it
 - **THEN** the replay record has `censored: true`, and the report shows it in the censored count
+
+#### Scenario: Tier 4 no-incident run stopped at a false alarm
+- **WHEN** a Tier 4 K002 record stored three polls, the third detected, and the variant answers no incident on all three
+- **THEN** the replay record has `censored: true` and is not counted as a false positive
+
+#### Scenario: Live run that never detected
+- **WHEN** a fault record's polls never detected and the variant also never detects
+- **THEN** `censored` is false and the run is a miss on the full window
 
 ### Requirement: Unmeasurable replay timings are null
 Replay records SHALL set `mttd_seconds` and every remediation field to `null`. They SHALL store `detect_poll` and `replay_detect_seconds_since_inject`, the original `seconds_since_inject` of the scored detecting poll. Reports SHALL NOT combine `replay_detect_seconds_since_inject` with live MTTD.

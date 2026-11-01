@@ -20,11 +20,11 @@
 
 ## 4. Replay
 
-- [ ] 4.1 `tier3/replay.py` and `python -m tier3 replay <records> --prompt <name> [--engine ...]`: load Tier 3 and Tier 4 records, ask every stored poll in order, score with `tier3/evaluate.py` (first detecting poll, else last), false-positive polls on no-incident records, `censored`, null timings, `detect_poll`, `replay_detect_seconds_since_inject` (D5)
-- [ ] 4.2 `tier2/replay.py` and `python -m tier2 replay`: the same for the single stored `request`, scored with `tier2/evaluate.py`
-- [ ] 4.3 Write replay records to `results/<tier>/replay/<run-id>/` with `mode`, `source`, `prompt` and `engine`. Skip non-`ok` sources and count them. Never touch the sources. Live scorecards refuse replay records without `--include-replay`
-- [ ] 4.4 Small Tier 2, Tier 3 and Tier 4 fixture records under `tests/fixtures/replay/` (hand-made, no live data)
-- [ ] 4.5 Offline tests with a fake engine: request equals stored `request` plus the variant's questions; no ground truth in any request (every fixture × every variant); censoring; control false-positive counting over all polls; source files unchanged; skipped sources
+- [x] 4.1 `tier3/replay.py` and `python -m tier3 replay <records> --prompt <name> [--engine ...]`: load Tier 3 and Tier 4 records, ask every stored poll in order, score with `tier3/evaluate.py` (first detecting poll, else last), false-positive polls on no-incident records, `censored`, null timings, `detect_poll`, `replay_detect_seconds_since_inject` (D5)
+- [x] 4.2 `tier2/replay.py` and `python -m tier2 replay`: the same for the single stored `request`, scored with `tier2/evaluate.py`
+- [x] 4.3 Write replay records to `results/<tier>/replay/<run-id>/` with `mode`, `source`, `prompt` and `engine`. Skip non-`ok` sources and count them. Never touch the sources. Live scorecards refuse replay records without `--include-replay` (also `--dry-run`, which prints the record and call counts and calls nothing; checked against real records: 351 calls for `10.3-combined`, 280 for `6.2-combined`; an engine that echoes the stored answers reproduces the live Tier 2, 3 and 4 scorecards exactly)
+- [x] 4.4 Small Tier 2, Tier 3 and Tier 4 fixture records under `tests/fixtures/replay/` (hand-made, no live data) (done differently: source records are made at test time by the offline fake runners for every Tier 2 and Tier 3 scenario and four Tier 4 ones, leak-bait telemetry included, plus hand-built dicts for censoring and scoring cases in `tests/test_replay.py`. No static fixture files)
+- [x] 4.5 Offline tests with a fake engine: request equals stored `request` plus the variant's questions; no ground truth in any request (every fixture × every variant); censoring; control false-positive counting over all polls; source files unchanged; skipped sources
 
 ## 5. Comparison report
 
