@@ -15,9 +15,9 @@ from tier3.replay import replay_batch
 from tier3.report import engine_name
 
 
-def variant(name, version=1, sha=None, dev=()):
+def variant(name, version=1, sha=None, dev=(), style="wording"):
     return Variant(name=name, version=version, tier="tier3", rationale="test", dev_records=tuple(dev),
-                   questions={}, sha256=sha or f"{name}-{version}".ljust(64, "0"), path="")
+                   questions={}, sha256=sha or f"{name}-{version}".ljust(64, "0"), path="", style=style)
 
 
 def as_live(src: dict) -> dict:
@@ -87,6 +87,14 @@ def test_three_variants_side_by_side(tmp_path):
     assert rows["detection F1"].endswith("| 4/5 (0.80) | 4/6 (0.67) | 0/2 (0.00) |")
     assert "Both the original live baseline and a replayed baseline are shown" in text
     assert "4 record(s) had no prompt field" in text  # the live sources
+
+
+def test_policy_stated_variants_are_labelled(tmp_path):
+    src = live_set(tmp_path / "live")
+    out = tmp_path / "out"
+    replay(src, out, variant("strict-incident", style="policy"), ok_decision(), run_id="a")
+    head = [l for l in format_compare([str(out)]).splitlines() if l.startswith("| |")][0]
+    assert head == "| | capture / strict-incident v1 (replay, policy stated) |"
 
 
 def test_compared_over_shared_sources_with_a_warning(tmp_path):

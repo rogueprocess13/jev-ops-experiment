@@ -58,6 +58,17 @@ Every run record, Tier 1 JSONL line, summary and replay record SHALL hold `promp
 - **WHEN** two records say `strict-incident` v1 but their hashes differ
 - **THEN** the comparison report fails and names both hashes
 
+### Requirement: Wording and policy-stated variants
+A variant file MAY set `style` to `wording` (the default) or `policy`. Any other value SHALL fail to load. `style` SHALL be recorded in `prompt` on every record. A record without it SHALL be read as `wording`. The comparison reports SHALL label policy-stated columns. A policy-stated variant SHALL state its rule in general operational terms only, under the same leak rules as every variant.
+
+#### Scenario: Policy variant in a comparison
+- **WHEN** replay records of a `style: policy` variant are compared
+- **THEN** its column label ends with "policy stated"
+
+#### Scenario: Unknown style
+- **WHEN** a variant sets `style: clever`
+- **THEN** loading fails and lists `wording` and `policy`
+
 ### Requirement: Variant text passes the leak rules
 No variant text SHALL contain a scenario name or ID, a fault type name, `jev-fault`, `flagd`, `feature_flag`, `ground_truth`, `expected`, `scenario` or `experiment`. Every existing request and prompt leak test SHALL run once per variant file.
 

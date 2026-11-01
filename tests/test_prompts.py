@@ -28,7 +28,8 @@ def test_baseline_equals_pre_variant_questions_byte_for_byte(tier, n):
 @pytest.mark.parametrize("tier", list(TIERS))
 def test_baseline_identity(tier):
     v = TIERS[tier].load_prompt("baseline")
-    assert v.identity == {"name": "baseline", "version": 1, "sha256": questions_hash(v.questions)}
+    assert v.identity == {"name": "baseline", "version": 1, "sha256": questions_hash(v.questions),
+                          "style": "wording"}
     assert len(v.sha256) == 64
 
 
@@ -117,6 +118,7 @@ def mutate(fn):
     (good_doc(version=True), "positive integer"),
     (good_doc(dev_records="results/x"), "dev_records"),
     (good_doc(prompt="free text"), "unknown keys ['prompt']"),
+    (good_doc(style="clever"), "style must be one of wording, policy"),
     (mutate(lambda d: d.pop("rationale")), "missing keys ['rationale']"),
 ])
 def test_rejections(prompts_dir, doc, needle):
@@ -124,6 +126,14 @@ def test_rejections(prompts_dir, doc, needle):
     with pytest.raises(VariantError) as e:
         load_variant("tier1", "v", SCHEMA)
     assert needle in str(e.value)
+
+
+def test_style_defaults_to_wording_and_is_in_the_identity(prompts_dir):
+    write(prompts_dir, good_doc())
+    assert load_variant("tier1", "v", SCHEMA).identity["style"] == "wording"
+    write(prompts_dir, good_doc(style="policy"))
+    v = load_variant("tier1", "v", SCHEMA)
+    assert v.style == "policy" and v.identity["style"] == "policy"
 
 
 def test_unquoted_yaml_boolean_keys_are_rejected(prompts_dir):

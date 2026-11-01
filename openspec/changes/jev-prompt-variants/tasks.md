@@ -36,7 +36,7 @@
 
 ## 6. Candidate variants
 
-- [x] 6.1 Read the dev-set records (Tier 1 seed 1000; Tier 2 `20261012-190447-369b`; Tier 3 `10.3-combined`), the false alarms first, and write a short note of what the baseline wording gets wrong (`docs/prompt-variants-dev-notes.md`, 2026-11-01. Open question for 6.3: whether a variant may state the operating policy behind the ground truth)
+- [x] 6.1 Read the dev-set records (Tier 1 seed 1000; Tier 2 `20261012-190447-369b`; Tier 3 `10.3-combined`), the false alarms first, and write a short note of what the baseline wording gets wrong (`docs/prompt-variants-dev-notes.md`, 2026-11-01. The open question was decided by the user the same day: policy text is allowed in general terms, marked `style: policy` and labelled in the reports, design D10)
 - [ ] 6.2 Write `strict-incident` and `evidence-options` for each tier, by hand, with `rationale` and `dev_records` (D8). No scenario-specific rules (D9)
 - [ ] 6.3 Have someone other than the author review the variants for hints and leaks before any live call, and record the review in the variant's commit message
 

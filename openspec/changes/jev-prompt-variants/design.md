@@ -121,6 +121,15 @@ These are hand-written per tier, each with a rationale in its file:
 
 More variants are added the same way. Each new one needs a rationale and a version.
 
+### D10. Wording variants and policy-stated variants
+
+Decided by the user on 2026-11-01 (task 6.1, `docs/prompt-variants-dev-notes.md`). Some baseline errors come from the question leaving out the rule the expected answers follow, for example "a failure that has already recovered is not an incident now". A variant MAY state such a rule. It must be in general operational terms that a real team could give its tool. It must name no scenario, fault type or service, and it must hold no rule tied to one case (D9). Each variant file declares `style`:
+
+- `wording` (default): only makes the existing questions and options clearer.
+- `policy`: also states the operating policy behind the expected answers.
+
+`style` is part of the recorded identity (`prompt.style`). The comparison reports mark policy-stated columns ("policy stated"), and results pages report the two kinds separately. A gain from a policy-stated variant shows that Jev can follow a stated policy. It does not show that Jev reads the situation better.
+
 ### D9. Leak and hint rules for variant text
 
 Variant text is sent to the engine, so the existing leak rules apply to it. A test loads every variant file and fails on scenario names and IDs (Tier 1 names, `F00x`, `K00x`), the ten fault type names, `jev-fault`, `flagd`, `feature_flag`, `ground_truth`, `expected`, `scenario` and `experiment`. The existing whole-path leak tests (`test_request_does_not_contain_scenario_or_expected`, the Tier 2/3/4 runner leak tests, `test_prompt_does_not_leak_scenario_or_expected`) are parametrised over every variant. A variant may describe what an option looks like in general terms. It may not contain rules tied to a scenario, such as "if cart has 0 replicas, answer scale_up". That cannot be fully tested, so it is a review rule in `CLAUDE.md`.

@@ -115,7 +115,8 @@ def prompt_of(records: list[dict]) -> str:
     if len(names) != 1:
         return "mixed prompts"
     n, v = names[0]
-    return n if v in (1, None) else f"{n} v{v}"
+    policy = any(record_prompt(r)[0].get("style") == "policy" for r in records)
+    return (n if v in (1, None) else f"{n} v{v}") + (" [policy stated]" if policy else "")
 
 
 def _label(records: list[dict]) -> str:

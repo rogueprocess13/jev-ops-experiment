@@ -82,4 +82,4 @@ Findings 1 and 4 can be fixed by writing the rule the ground truth uses into the
 1. Write the policy in general operational terms only, and report such variants as "policy stated" in the results, separate from variants that only clarify wording.
 2. Leave policy out entirely, and only make the existing words unambiguous ("now" = at the end of the window).
 
-The candidates in task 6.2 will follow option 1 unless review says otherwise.
+**Decided (2026-11-01, by the user): option 1.** Policy text is allowed in general operational terms. Such a variant sets `style: policy`, which is recorded with every run and labelled "policy stated" in the comparison reports (design D10).

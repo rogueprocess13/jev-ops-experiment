@@ -185,9 +185,11 @@ def test_tier3_record_and_summary_carry_the_prompt(test_variant, tmp_path):
 
 
 def test_record_without_prompt_reads_as_baseline():
-    assert record_prompt({"run_id": "old"}) == ({"name": "baseline", "version": 1, "sha256": None}, True)
-    p = {"name": "marked", "version": 3, "sha256": "ab"}
+    assert record_prompt({"run_id": "old"}) == ({"name": "baseline", "version": 1, "sha256": None,
+                                                 "style": "wording"}, True)
+    p = {"name": "marked", "version": 3, "sha256": "ab", "style": "policy"}
     assert record_prompt({"prompt": p}) == (p, False)
+    assert record_prompt({"prompt": {"name": "x", "version": 1, "sha256": "c"}})[0]["style"] == "wording"
     assert record_prompt({"prompt": None})[1] is True
 
 

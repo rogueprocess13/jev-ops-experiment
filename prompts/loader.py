@@ -24,7 +24,10 @@ TIERS = ("tier1", "tier2", "tier3")
 DEFAULT_VARIANT = "baseline"
 TYPES = ("choice", "noul")
 NOUL_OPTIONS = ("true", "false")
-TOP_KEYS = {"name", "version", "tier", "rationale", "dev_records", "questions"}
+TOP_KEYS = {"name", "version", "tier", "style", "rationale", "dev_records", "questions"}
+# "wording": only makes the existing questions clearer. "policy": also states, in general
+# operational terms, the rule behind the expected answers. Reports show the two apart.
+STYLES = ("wording", "policy")
 QUESTION_KEYS = {"instructions", "criteria", "criteria_templates"}
 
 
@@ -60,10 +63,11 @@ class Variant:
     questions: dict
     sha256: str
     path: str
+    style: str = "wording"
 
     @property
     def identity(self) -> dict:
-        return {"name": self.name, "version": self.version, "sha256": self.sha256}
+        return {"name": self.name, "version": self.version, "sha256": self.sha256, "style": self.style}
 
 
 def questions_hash(questions: dict) -> str:
@@ -178,11 +182,14 @@ def load_variant(tier: str, name: str, schema: dict[str, QuestionSpec]) -> Varia
     dev = doc.get("dev_records") or []
     if not isinstance(dev, list) or not all(isinstance(d, str) for d in dev):
         raise VariantError(f"{where}: dev_records must be a list of paths")
+    style = doc.get("style", "wording")
+    if style not in STYLES:
+        raise VariantError(f"{where}: style must be one of {', '.join(STYLES)}")
     questions = build_questions(where, schema, doc["questions"])
     return Variant(name=name, version=version, tier=tier,
                    rationale=_text(f"{where}.rationale", doc["rationale"]),
                    dev_records=tuple(dev), questions=questions,
-                   sha256=questions_hash(questions), path=str(path))
+                   sha256=questions_hash(questions), path=str(path), style=style)
 
 
 def engine_prompt(engine) -> dict | None:
@@ -200,8 +207,9 @@ def record_prompt(record: dict) -> tuple[dict, bool]:
     existed have no `prompt` field and are read as baseline version 1, sha256 unknown."""
     p = record.get("prompt")
     if isinstance(p, dict) and p.get("name"):
-        return {"name": p["name"], "version": p.get("version"), "sha256": p.get("sha256")}, False
-    return {"name": DEFAULT_VARIANT, "version": 1, "sha256": None}, True
+        return {"name": p["name"], "version": p.get("version"), "sha256": p.get("sha256"),
+                "style": p.get("style", "wording")}, False
+    return {"name": DEFAULT_VARIANT, "version": 1, "sha256": None, "style": "wording"}, True
 
 
 def all_variant_text(variant: Variant) -> str:

@@ -32,11 +32,13 @@ class Group:
     version: int | None
     records: list[tuple[str, dict]] = field(default_factory=list)  # (source key, record)
     assumed: int = 0  # records read as baseline because they had no prompt field
+    style: str = "wording"
 
     @property
     def label(self) -> str:
         v = f" v{self.version}" if self.version is not None else ""
-        return f"{self.engine} / {self.prompt}{v} ({self.mode})"
+        tag = ", policy stated" if self.style == "policy" else ""
+        return f"{self.engine} / {self.prompt}{v} ({self.mode}{tag})"
 
 
 def cell(pair) -> str:
@@ -67,7 +69,7 @@ def group_records(items: list[tuple[Path, dict]], engine_name: Callable[[dict], 
         ident, assumed = record_prompt(rec)
         mode = "replay" if rec.get("mode") == "replay" else "live"
         k = (mode, engine_name(rec), ident["name"], ident["version"])
-        g = groups.setdefault(k, Group(mode, k[1], k[2], k[3]))
+        g = groups.setdefault(k, Group(mode, k[1], k[2], k[3], style=ident.get("style", "wording")))
         g.records.append((source_key(path, rec), rec))
         g.assumed += assumed
         if ident["sha256"]:
@@ -142,7 +144,7 @@ def render(title: str, items: list[tuple[Path, dict]], rows, *, engine_name,
         for g in groups:
             recs = [(k, r) for k, r in g.records if member is None or k in member]
             if recs:
-                sub.append(Group(g.mode, g.engine, g.prompt, g.version, recs, g.assumed))
+                sub.append(Group(g.mode, g.engine, g.prompt, g.version, recs, g.assumed, g.style))
         out += [f"## {heading}", ""]
         if roots is not None:
             out += ["Sources: " + ", ".join(f"`{x}`" for x in sorted(roots)), ""]
