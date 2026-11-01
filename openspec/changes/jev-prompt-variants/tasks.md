@@ -42,7 +42,7 @@
 
 ## 7. Live comparison (real Jev calls)
 
-- [ ] 7.1 Tier 1: run 70 runs with `--seed 1000` for each variant (dev), then 70 runs with `--seed 2000` for `baseline` and each variant (confirm)
+- [x] 7.1 Tier 1: run 70 runs with `--seed 1000` for each variant (dev), then 70 runs with `--seed 2000` for `baseline` and each variant (confirm) (2026-11-01, Jev API, jev-1.14.0, v3 variants: dev `results/20261101-182029-70runs-prompt-strict-incident.jsonl`, `...182055-...-evidence-options.jsonl`; confirm `...182121-70runs.jsonl` (baseline), `...182146-...-strict-incident.jsonl`, `...182212-...-evidence-options.jsonl`. 350 calls, 0 errors, 0 invalid, $0.0222 estimated. The dev baseline `20261018-134025-70runs.jsonl` was answered by jev-1.13.0, so dev comparisons against it mix a model change)
 - [ ] 7.2 Tier 2: replay `baseline` and each variant on both Tier 2 directories
 - [ ] 7.3 Tier 3/4: replay `baseline` and each variant on `results/tier3/10.3-combined` (dev) and `results/tier4/6.2-combined` (confirm)
 - [ ] 7.4 Optional: if a variant clearly beats baseline on the confirm set, run one live Tier 3 batch with it (`./run-all-k8s-experiments --prompt <name>`) to check it without censoring and with real MTTD
