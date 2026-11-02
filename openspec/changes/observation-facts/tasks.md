@@ -22,12 +22,12 @@
 
 ## 4. Phase B gate and time-split
 
-- [ ] 4.1 Decide the gate (D6) from 3.4 and record the decision here
-- [ ] 4.2 If go: recent and earlier windows in `tier3/collect.py`, the `time-split` layout, replay refusal, null rules, budget per block, offline tests
-- [ ] 4.3 If go: live Tier 4 batch with `time-split`, Jev and Opus, and a results page
+- [x] 4.1 Decide the gate (D6) from 3.4 and record the decision here (2026-11-02: no-go. On the confirm set K002/K010 did not change with `facts` or `facts` + `strict-incident`, and RCA moved +2/-0, inside the pre-stated "2-3 runs is noise" band. The user chose not to start Phase B anyway)
+- [x] 4.2 Skipped (gate no-go). If go: recent and earlier windows in `tier3/collect.py`, the `time-split` layout, replay refusal, null rules, budget per block, offline tests
+- [x] 4.3 Skipped (gate no-go). If go: live Tier 4 batch with `time-split`, Jev and Opus, and a results page
 
 ## 5. Docs and rules
 
 - [x] 5.1 README: "Observation layouts" section and `--observation` in the command tables
 - [x] 5.2 `CLAUDE.md`: layout rules (pure function for replayable layouts, no suspect field, same treatment for every service, version bump, leak tests over every layout); `tier3/layouts.py` in the layout; this tasks file in the conventions
-- [ ] 5.3 `./run-all.sh --check` passes on a fresh clone with no key; CI green
+- [x] 5.3 `./run-all.sh --check` passes on a fresh clone with no key; CI green (2026-11-02, CI run 41462979237 on de7dcbc)

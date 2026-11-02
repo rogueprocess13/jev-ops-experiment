@@ -90,4 +90,4 @@ Design D6: start Phase B only if Phase A, or the recent-window question, changes
 - K002/K010: no change with `facts`. `strict-incident` removed one K010 false alarm on confirm and none on dev, and it lost a K000 run and a detection. Not beyond noise.
 - RCA: +2 on confirm (0 lost), against 0 same-day flips. That is above the measured noise but inside the pre-stated "2-3 runs is noise" band.
 
-Decision: pending (task 4.1).
+Decision (task 4.1): no-go. The gate is not met, and Phase B (`time-split`) is not started. `facts` stays available as an opt-in layout (`--observation facts`); `raw` stays the default.
