@@ -1,6 +1,6 @@
 # jev-ops-experiment
 
-This project tests whether Jev AI can make bounded operational decisions from synthetic server-state information. Server conditions are generated from predefined scenarios with independently defined expected outcomes. Jev receives the observations and selects from a bounded set of operational decisions. The experiment then compares Jev's decisions against the expected outcomes and records accuracy and confidence.
+This project tests whether Jev AI can make bounded operational decisions from synthetic server-state information. The harness generates server conditions from predefined scenarios, and each scenario has an independently defined expected outcome. Jev receives the observations and picks from a bounded set of operational decisions. The experiment then compares Jev's decisions with the expected outcomes and records accuracy and confidence.
 
 > **This is an experimental benchmark, not a production autonomous remediation system.** Tiers 1 to 3 only generate or collect data, ask Jev for a decision and record the answer. They never carry out Jev's recommendation. The only changes Tiers 2 and 3 make are the harness's own fault injection and reset on their test systems. Only Tier 4 carries out a recommendation, once per run, from a fixed three-operation allowlist, and only on the local kind testbed.
 
@@ -18,11 +18,11 @@ Prepared for discussion in the LF Edge AIOps forum.
 | Infrastructure | None (Python only) | Docker Compose | A local four-node kind cluster | Tier 3's cluster |
 | Run with | `./run-all.sh` (this page, below) | `./run-experiment F001` ([Tier 2](#tier-2-opentelemetry-demo)) | `./run-k8s-experiment K001` ([Tier 3](#tier-3-kubernetes-faults-on-kind)) | `./run-remediation-experiment K001` ([Tier 4](#tier-4-closed-loop-remediation-on-kind)) |
 
-The tiers share only the Jev client (`jev/client.py`); Tier 3 also reuses Tier 2's collectors and scrubber, and Tier 4 reuses Tier 3's runner and cluster. Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tiers 2, 3 and 4 have their own sections.
+The tiers share only the Jev client (`jev/client.py`). Tier 3 also reuses Tier 2's collectors and scrubber, and Tier 4 reuses Tier 3's runner and cluster. Everything from "Quick start" down to "Docker (optional)" describes Tier 1. Tiers 2, 3 and 4 have their own sections.
 
 ## Results so far
 
-Every tier has been run live against real Jev, on the dates in the write-ups below. v0.1.0 was tagged on 2026-10-19. Figures come from the run records only. **Start with the [one-page summary](docs/results-2026-11-02-summary.md) (2026-11-02).**
+We ran every tier live against real Jev, on the dates in the write-ups below. v0.1.0 was tagged on 2026-10-19. Figures come from the run records only. **Start with the [one-page summary](docs/results-2026-11-02-summary.md) (2026-11-02).**
 
 | Tier | Write-up |
 |---|---|
@@ -115,7 +115,7 @@ The API details used are in [docs/jev-api-notes.md](docs/jev-api-notes.md).
 | hung_worker | high | restart | no | application_bug |
 | log_only_errors | high | investigate | yes | application_bug |
 
-Probable cause is scored separately. A run is PASS when severity, action and human review are all right, because that is the operational decision. The cause is Jev's diagnosis: does it read the logs and metrics correctly? It gets its own accuracy line in the summary and report, and a wrong cause does not turn a PASS into a FAIL. `dependency_failure`, `configuration` and `network` are not the expected answer for any scenario. They are there so Jev has plausible wrong options to choose.
+Probable cause is scored separately. A run is PASS when severity, action and human review are all right, because that is the operational decision. The cause is Jev's diagnosis: does it read the logs and metrics correctly? It gets its own accuracy line in the summary and report, and a wrong cause does not turn a PASS into a FAIL. `dependency_failure`, `configuration` and `network` are not the expected answer for any scenario. They are there so Jev has plausible wrong options to choose from.
 
 `healthy`, `degraded` and `critical` have fairly clear answers. `ambiguous` and `contradictory` are judgment calls: the evidence does not point cleanly to one action, so the expected outcome is our reasoned choice (do not restart or escalate on weak or conflicting evidence, investigate, and ask a human). A different but sensible answer there is not necessarily a model failure. Look at the per-field results and the raw responses, not only the pass rate. The reasoning for each is next to its definition.
 
@@ -157,7 +157,7 @@ Things to know:
 
 - Claude without an API key. If `ANTHROPIC_API_KEY` is not set, the Claude engines use the `claude` CLI (`claude -p`) instead and print a warning first. It runs in an empty temporary directory with no tools, settings, hooks or MCP servers, but it is still the Claude Code harness, not the bare API. Those results are labelled `transport=claude-cli`, and the comparison report says so. Set the key for the cleanest comparison.
 - Confidence. Only Jev returns probabilities. The LLMs return none, and the harness makes none up, so confidence is not compared.
-- Cost. Claude API cost is `n/a` unless you set the `CLAUDE_*_PRICE_*` variables (`.env.example` lists Anthropic's prices on 2026-10-05 as commented examples). The CLI reports a cost itself. On a subscription plan that figure is notional. Ollama is local, so cost is `n/a`.
+- Cost. Claude API cost is `n/a` unless you set the `CLAUDE_*_PRICE_*` variables (`.env.example` lists Anthropic's prices on 2026-10-05 as commented examples). The CLI reports a cost itself. On a subscription plan, that figure is notional. Ollama is local, so cost is `n/a`.
 - Repeatability. Ollama runs use temperature 0 and the run seed, so they repeat exactly. Claude models do not accept a temperature, so repeat runs (10 per scenario) and look at the spread.
 - Refusals. A Claude refusal counts as `invalid` (wrong). The harness asks no other model in its place.
 - `./run-all.sh 70 --seed 1000 --engine claude-sonnet` works too. It only asks for `JEV_API_KEY` when the engine is Jev.
@@ -170,7 +170,7 @@ API details for the baseline engines are in [docs/llm-baseline-notes.md](docs/ll
 python report.py --metrics results/A.jsonl [results/B.jsonl ...]
 ```
 
-Writes `results/<timestamp>-metrics-report.md` with one column per file: accuracy with 95% confidence intervals, precision/recall/F1 per class plus macro and weighted F1, incident detection (recall, false positive rate, miss rate), human-review F1, over- and under-reaction, Brier score (Jev only), latency p50/p90/p95/p99, availability and error rates, tokens and cost per run and per correct decision, and confusion matrices. It ends with a glossary, and a section on metrics that do not apply here (MTTD, MTTR, MTBF, uptime) and why.
+It writes `results/<timestamp>-metrics-report.md` with one column per file: accuracy with 95% confidence intervals, precision/recall/F1 per class plus macro and weighted F1, incident detection (recall, false positive rate, miss rate), human-review F1, over- and under-reaction, Brier score (Jev only), latency p50/p90/p95/p99, availability and error rates, tokens and cost per run and per correct decision, and confusion matrices. It ends with a glossary, and a section on metrics that do not apply here (MTTD, MTTR, MTBF, uptime) and why.
 
 ## Prerequisites
 
@@ -388,7 +388,7 @@ Jev receives one JSON object, the same shape every run, built only from collecte
 | `error_logs` | WARN and ERROR lines, deduplicated with a count, at most 3 per service for 8 services, 240 characters each |
 | `failing_traces` | up to 5 failing traces: the service path, duration, and the failed spans with the error text |
 
-The whole observation has a cap of 60,000 bytes. The harness trims the lowest-ranked items first and records what it trimmed in the result file only. The harness asks Jev four fixed questions (`incident_detected`, `affected_service`, `diagnosis`, `recommended_action`) with the same answer vocabulary every time, including `unknown`, `none` and `no_action` so it is never forced to guess.
+The whole observation has a cap of 60,000 bytes. The harness trims the lowest-ranked items first and records what it trimmed in the result file only. The harness asks Jev four fixed questions (`incident_detected`, `affected_service`, `diagnosis`, `recommended_action`) with the same answer vocabulary every time, including `unknown`, `none` and `no_action`, so Jev is never forced to guess.
 
 What Jev does not receive: the experiment ID, the flag name or variant, the target service as a label, the expected diagnosis or action, any evaluation, or `feature_flag` data. A scrubber removes flag names, `flagd` and `feature_flag` attributes from all telemetry, and the collectors exclude `flagd`, `flagd-ui`, `telemetry-docs` and `load-generator` entirely. Tests run every scenario through the full path with deliberately contaminated fixtures and fail if any of these reaches the engine.
 
@@ -404,7 +404,7 @@ Limit: service names and error messages are evidence and are sent. A model could
 ./run-all-experiments --repeats 3
 ```
 
-Each run follows the same lifecycle: check health, wait for steady load, take a baseline, inject, wait for the fault to show up, collect, build the observation, ask Jev, store the raw answer, evaluate, reset the fault, and check the system returned to baseline. If it did not, the run is marked `contaminated` and the batch stops, because later experiments would be invalid. Each run makes one Jev call and takes about 8 to 10 minutes.
+Each run follows the same lifecycle: check health, wait for steady load, take a baseline, inject, wait for the fault to show up, collect, build the observation, ask Jev, store the raw answer, evaluate, reset the fault, and check that the system returned to baseline. If it did not, the run is marked `contaminated` and the batch stops, because later experiments would be invalid. Each run makes one Jev call and takes about 8 to 10 minutes.
 
 | ID | Fault (flagd flag) | What it tests |
 |---|---|---|
@@ -421,7 +421,7 @@ See `docs/otel-demo-notes.md` for how each flag was verified and which ones beha
 
 ### How results are evaluated
 
-`tier2/evaluate.py` is a pure function of the stored Jev decision and the hidden ground truth, run after the answer is stored. Detection compares the incident flag. Localization compares the service. Diagnosis compares the failure mode. Action checks the recommendation against the scenario's acceptable list. UNKNOWN means Jev's reply was invalid or the call failed. The harness never counts it as PASS or FAIL. Aggregates give counts per dimension and a false-positive rate over control runs. Ground truth is hand-written in each scenario file with a rationale; it is never derived from Jev or from the collected telemetry.
+`tier2/evaluate.py` is a pure function of the stored Jev decision and the hidden ground truth, run after the answer is stored. Detection compares the incident flag. Localization compares the service. Diagnosis compares the failure mode. Action checks the recommendation against the scenario's acceptable list. UNKNOWN means Jev's reply was invalid or the call failed. The harness never counts it as PASS or FAIL. Aggregates give counts per dimension and a false-positive rate over control runs. Ground truth is hand-written in each scenario file with a rationale. It is never derived from Jev or from the collected telemetry.
 
 The harness writes results to `results/tier2/<run-id>/<ID>.json` (git-ignored) with the fault, ground truth, Jev's normalized answer and raw response, the four verdicts, timing (`null` when not measurable), the exact request sent, the demo image versions and the git commit.
 
@@ -529,7 +529,7 @@ Notes on the testbed, the verified facts and every dropped scenario are in `docs
 
 > Status: done. The first full live Jev batch (40 runs) is written up in [docs/results-2026-10-19-tier4-jev.md](docs/results-2026-10-19-tier4-jev.md), and the Claude Opus baseline on the same path (40 runs, through the `claude` CLI) in [docs/results-2026-10-19-tier4-jev-vs-opus.md](docs/results-2026-10-19-tier4-jev-vs-opus.md). Recovered by the single action: Jev 4/18 incident runs, Opus 13/18.
 
-Tier 3 reports remediation executed, MTTR and recovery verified as "not measured", because it never acts. Tier 4 runs the same scenarios (`K000` to `K010`) on the same cluster, and after the first poll that reports an incident it carries out Jev's recommended action on Jev's named component, once. Then it watches whether the system recovers. This is the only tier that acts on an engine's recommendation.
+Tier 3 reports remediation executed, MTTR and recovery verified as "not measured", because it never acts. Tier 4 runs the same scenarios (`K000` to `K010`) on the same cluster, and after the first poll that reports an incident, it carries out Jev's recommended action on Jev's named component, once. Then it watches whether the system recovers. This is the only tier that acts on an engine's recommendation.
 
 | Jev's action | What the harness does |
 |---|---|
@@ -540,7 +540,7 @@ Tier 3 reports remediation executed, MTTR and recovery verified as "not measured
 
 Only Deployments in the demo namespace can be acted on. A node, `none` or an infrastructure name is "not executable" and nothing changes. The harness saves the target's state to the fault ledger before acting, and reset restores the action and then the fault. The fault stays injected while recovery is watched, so only the action can fix it.
 
-Recovered means every Deployment is back at baseline availability with its rollout complete, every application pod is Ready and no service deviates from baseline (span metrics over 120 s, which arrive every 60 s, and missing data fails the check), for at least the last 60 s of a 360 s watch (a pass that later fails is a relapse, not a recovery). The watch starts when the action is done, or right after the scored poll when nothing is carried out. A `scale_up` is done when the new replica count is written. A `restart_service` or `rollback_change` is done when its rollout is complete (or the rollout wait times out). Each run is `recovered_by_action`, `recovered_without_action` (the system was already back, or healed on its own) or `not_recovered`.
+Recovered means every Deployment is back at baseline availability with its rollout complete, every application pod is Ready and no service deviates from baseline. The service check uses span metrics over 120 s, which arrive every 60 s, and missing data fails it. All of this must hold for at least the last 60 s of a 360 s watch. A pass that later fails is a relapse, not a recovery. The watch starts when the action is done, or right after the scored poll when nothing is carried out. A `scale_up` is done when the new replica count is written. A `restart_service` or `rollback_change` is done when its rollout is complete (or the rollout wait times out). Each run is `recovered_by_action`, `recovered_without_action` (the system was already back, or healed on its own) or `not_recovered`.
 
 **This is single-shot recommendation MTTR**: one answer, carried out once, no feedback or retry. It is not operational MTTR, where an engineer or agent investigates, tries, checks and retries. A Claude Opus engine answering the same four questions through the same path is the like-for-like baseline: add `--engine claude-opus` to `python -m tier4 run`/`batch` (or the wrapper scripts). It uses the Anthropic API when `ANTHROPIC_API_KEY` is set, else the `claude` CLI, as in Tier 1. Every record and the LF Edge `approach` field say which engine answered.
 
@@ -549,7 +549,7 @@ MTTR, as the LF Edge harness defines it (`run_harness.py`, read 2026-10-18): `mt
 | | LF Edge harness | Tier 4 |
 |---|---|---|
 | Faults | ten Kubernetes API faults | the same ten, same names, exact restore |
-| Agent | tool-calling loop that gathers evidence, writes its own fix and can retry | the engine answers four fixed questions; the harness carries out the action once, from a three-operation allowlist |
+| Agent | tool-calling loop that gathers evidence, writes its own fix and can retry | the engine answers four fixed questions. The harness carries out the action once, from a three-operation allowlist |
 | `mttr_seconds` | fault to remediation written | the same |
 | `mttr_verified_seconds` | fault to the injected target's spec and readiness check passing, per fault type, no hold; never for `kill_pod`, `pvc_full`, `node_taint` | fault to the start of the final run of service-level checks, held for at least 60 s to the end of a 360 s watch |
 | Healthy control | skip-injection mode, false alarms not scored | `K000`, every poll scored; actions on false alarms recorded |
@@ -573,7 +573,7 @@ The wrapper scripts pass every argument on to `python -m tier4 batch`.
 
 ## Prompt variants (`--prompt`)
 
-Does the wording of the questions matter? A prompt variant changes only the question and option text Jev (or a baseline engine) is asked. Observations, allowed answers, parsing and scoring stay the same. Variants live in `prompts/<tier>/<name>.yaml` (Tier 4 uses Tier 3's); `baseline` is the wording used in every results page before 2026-11-01 and is the default. Every record stores the variant's name, version and `sha256`, and the reports group and label columns by it.
+Does the wording of the questions matter? A prompt variant changes only the question and option text Jev (or a baseline engine) is asked. Observations, allowed answers, parsing and scoring stay the same. Variants live in `prompts/<tier>/<name>.yaml` (Tier 4 uses Tier 3's). `baseline` is the wording used in every results page before 2026-11-01 and is the default. Every record stores the variant's name, version and `sha256`, and the reports group and label columns by it.
 
 ```bash
 # Tier 1: live, the observations come from the seed
@@ -639,7 +639,7 @@ The image contains no credentials, and the build excludes `.env`. Pass them at r
 | `could not create a virtual environment` | Debian/Ubuntu: `sudo apt install python3-venv` |
 | `JEV_API_KEY is not set` / `still the placeholder` | Put your real key in `.env` |
 | `ERROR ... HTTP 401` in the results | The key is wrong or revoked |
-| `HTTP 429` / `529` | Rate limited or overloaded. The client retries with backoff; lower `--runs` or try later |
+| `HTTP 429` / `529` | Rate limited or overloaded. The client retries with backoff. Lower `--runs` or try later |
 | `./run-all.sh: Permission denied` | `chmod +x run-all.sh`, or run `bash run-all.sh` |
 | Broken venv after moving the folder | `rm -rf .venv` and run `./run-all.sh --check` again |
 

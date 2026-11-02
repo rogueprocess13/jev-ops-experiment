@@ -1,6 +1,6 @@
 # Results: precision, recall and F1 across all four tiers (2026-11-01)
 
-This page answers the first of the next steps posted on [lfedgeai/AIOps#41](https://github.com/lfedgeai/AIOps/issues/41) (2026-10-27): "Calculate F1 score / recall / precision". No new runs were made. Every figure is computed from run records already used in the earlier results pages.
+This page answers the first of the next steps posted on [lfedgeai/AIOps#41](https://github.com/lfedgeai/AIOps/issues/41) (2026-10-27): "Calculate F1 score / recall / precision". We made no new runs. Every figure comes from run records already used in the earlier results pages.
 
 ## Sources
 
@@ -11,11 +11,11 @@ This page answers the first of the next steps posted on [lfedgeai/AIOps#41](http
 | 3 | `results/tier3/20261018-070851-60ee/` (fault runs) and `results/tier3/20261018-100756-41e8/` (control), combined as `results/tier3/10.3-combined/` | `python -m tier3 scorecard <dir>` |
 | 4 | Jev: `results/tier4/6.2-combined/`. Opus (through `claude -p`): `results/tier4/7.5-combined/` | `python -m tier4 scorecard <dir>` |
 
-Tier 1 runs used seed 1000, 70 runs each. The 2026-10-05 Jev batch gives almost the same figures as the 2026-10-18 batch with logs ([results-2026-10-18-tier1-jev.md](results-2026-10-18-tier1-jev.md)), so it is left out here.
+Tier 1 runs used seed 1000, 70 runs each. The 2026-10-05 Jev batch gives almost the same figures as the 2026-10-18 batch with logs ([results-2026-10-18-tier1-jev.md](results-2026-10-18-tier1-jev.md)), so we leave it out here.
 
 ## Tier 1: incident detection
 
-The decision is treated as a detector. An incident is any expected severity other than `normal`. The engine detects one when it answers a severity other than `normal`. Only the `healthy` scenario is a negative (10 runs), so precision and the false positive rate rest on few runs.
+We treat the decision as a detector. An incident is any expected severity other than `normal`. The engine detects one when it answers a severity other than `normal`. Only the `healthy` scenario is a negative (10 runs), so precision and the false positive rate rest on few runs.
 
 | | Jev (logs) | Jev (no logs) | Claude Sonnet | Claude Opus | Ollama qwen3:8b |
 |---|---|---|---|---|---|
@@ -67,7 +67,7 @@ Tier 2 asks Jev once per run. The 24 runs are 20 fault runs (F001, F003 to F006,
 | Recall | 20/20 |
 | F1 | 40/44 (0.91) |
 
-Here F1 hides the main result. Jev reported an incident in all 24 runs, healthy ones included, so it never told a healthy system from a faulty one at Tier 2. A detector that always says "incident" gets the same scores. The figures were computed by a short script over `results/tier2/20261012-190447-369b/` and `results/tier2/20261012-195728-7983/`, counting a run as detected when Jev's reply was `ok` and `incident_detected` was true. The Tier 2 CLI does not print them.
+Here F1 hides the main result. Jev reported an incident in all 24 runs, healthy ones included, so it never told a healthy system from a faulty one at Tier 2. A detector that always says "incident" gets the same scores. A short script computed the figures over `results/tier2/20261012-190447-369b/` and `results/tier2/20261012-195728-7983/`, counting a run as detected when Jev's reply was `ok` and `incident_detected` was true. The Tier 2 CLI does not print them.
 
 ## Limits
 

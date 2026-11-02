@@ -2,9 +2,9 @@
 
 Consulted: 2026-09-29, corrected 2026-10-05. Primary source: TypeSafe's API reference, https://docs.typesafe.ai/api. Jev is TypeSafe's model. Cross-checked against the Pydantic AI TypeSafe page (https://pydantic.dev/docs/ai/models/typesafe/), which agrees on model names, `TYPESAFE_API_KEY`, and the choice/rubric/boolean question types.
 
-Correction (2026-10-05): the first version of these notes used https://thejevai.com/docs as the primary source. That site is not TypeSafe. Its footer says "Jev AI is an independently operated product and is not affiliated with, operated by, or endorsed by TypeSafe." A key from the TypeSafe console (`apikey_` prefix) gets `401 {"code":-1,"message":"Invalid API key."}` on `https://thejevai.com/v1/systemone` and works on `https://api.typesafe.ai/v1/systemone` (a fake key gets 401 there, and the real key gets 200 with answers, model `jev-1.13.0`). The request and response shapes below matched in real runs on 2026-10-05. Details first taken from thejevai.com and not yet re-checked against docs.typesafe.ai are marked.
+Correction (2026-10-05): the first version of these notes used https://thejevai.com/docs as the primary source. That site is not TypeSafe. Its footer says "Jev AI is an independently operated product and is not affiliated with, operated by, or endorsed by TypeSafe." A key from the TypeSafe console (`apikey_` prefix) gets `401 {"code":-1,"message":"Invalid API key."}` on `https://thejevai.com/v1/systemone`. The same key works on `https://api.typesafe.ai/v1/systemone`: there a fake key gets 401 and the real key gets 200 with answers, model `jev-1.13.0`. The request and response shapes below matched in real runs on 2026-10-05. Details first taken from thejevai.com and not yet re-checked against docs.typesafe.ai are marked.
 
-Not used: other sites found by search (blog posts, community sites, unofficial GitHub notes). One of them (jevai.org) describes a different endpoint (`/v1/decisions`) and was ignored.
+Not used: other sites found by search (blog posts, community sites, unofficial GitHub notes). One of them (jevai.org) describes a different endpoint (`/v1/decisions`). We ignored it.
 
 ## Endpoint and auth
 
@@ -56,7 +56,7 @@ Question types:
 
 ## Context limits
 
-Pydantic AI page: 32k tokens per request. Not a concern for one small observation per request.
+Pydantic AI page: 32k tokens per request. This does not matter for one small observation per request.
 
 ## Mapping for this project
 
@@ -75,7 +75,7 @@ Overall confidence for a run: the mean of the `severity` and `action` choice con
 
 Environment variables: `JEV_API_KEY` (required), `JEV_API_URL` (default `https://api.typesafe.ai/v1/systemone`), `JEV_MODEL` (default `jev-latest`), `JEV_TIMEOUT_S` (default 30), `JEV_MAX_RETRIES` (default 3).
 
-The model version that answered is in the response `model` field. It is recorded per run, because `jev-latest` may change over time.
+The model version that answered is in the response `model` field. It is recorded per run, because `jev-latest` can change over time.
 
 ## Python
 
@@ -114,7 +114,7 @@ In `poll` mode one run makes one request per poll (up to 16 with the default 240
 
 Checked 2026-11-01 against https://docs.typesafe.ai/api. What a variant can change, and what it cannot:
 
-- `instructions` is optional on every question type. Per the docs it is "the yes/no question or statement to evaluate" (`noul`) or "what the model should decide when choosing an option" (`choice`). The schema accepts a string, an object, an array or `null`.
+- `instructions` is optional on every question type. The docs describe it as "the yes/no question or statement to evaluate" (`noul`) or "what the model should decide when choosing an option" (`choice`). The schema accepts a string, an object, an array or `null`.
 - `criteria` shapes the answer. For `noul` it holds the `true` and `false` keys ("what counts as a yes answer" and "what counts as a no answer"). For `choice` it maps each option to a description of "when each applies", 1 to 255 entries. The docs say "a choice without a description is interpreted by its name alone", so option descriptions do reach the model. Values may be a string, an object, an array or `null`.
 - The docs give no character or token limit for `instructions` or `criteria`. The only limits are on counts: 1 to 255 choice options, 1 to 10 score levels, at least one question.
 - There is no request field for context, examples, a system prompt, temperature or reasoning. `assets` (images) and the `TypeSafe-Danger-Zone-Long-Context: true` header exist. The docs do not say what the header changes, and this project uses neither.

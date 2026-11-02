@@ -2,8 +2,8 @@
 
 This page repeats the live Tier 4 comparison of [results-2026-10-19-tier4-jev-vs-opus.md](results-2026-10-19-tier4-jev-vs-opus.md), with two changes:
 
-- **Opus answered through the Anthropic API** (`transport: anthropic-api`), not `claude -p`. The CLI was kept off `PATH` for the Opus batches, so a missing key would have stopped them instead of falling back.
-- **Jev is `jev-1.14.0`**, not `jev-1.13.0`.
+- Opus answered through the Anthropic API (`transport: anthropic-api`), not `claude -p`. We kept the CLI off `PATH` for the Opus batches, so a missing key would have stopped them instead of falling back.
+- Jev is `jev-1.14.0`, not `jev-1.13.0`.
 
 Everything else is unchanged: the same kind cluster, the same eleven scenarios (K001-K010 x3, K000 x10), the same observations, the same four questions (baseline prompt), one action per run from the allowlist, and a 360 s recovery watch. How a run works, and how it differs from the LF Edge harness, is on the October pages and is not repeated here.
 
@@ -36,9 +36,9 @@ Chain script: `results/tier4/chain-20261101.sh`, log `chain-20261101.log`. The f
 | False-positive runs (no-incident scenarios and control) | **4/22** | 7/22 |
 | Detection precision / F1 | 18/22, 0.90 | 18/25, 0.84 |
 
-"Remediation correct" scores the recommended action against the scenario's acceptable actions, which include `investigate`. It does not say whether the action fixed anything; the next table does.
+"Remediation correct" scores the recommended action against the scenario's acceptable actions, which include `investigate`. It does not say whether the action fixed anything. The next table shows that.
 
-False positives: both engines call K002 (cart pods deleted once, recovered) an incident 3/3 and K010 1/3. Opus also calls K006 (a config variable cart does not read) an incident 3/3; Jev never does. No false-alarm action was carried out by either engine (`investigate` does nothing), and no healthy run was disturbed.
+False positives: both engines call K002 (cart pods deleted once, recovered) an incident 3/3 and K010 1/3. Opus also calls K006 (a config variable cart does not read) an incident 3/3. Jev never does. The harness carried out no false-alarm action for either engine (`investigate` does nothing), and no healthy run was disturbed.
 
 ## Remediation and MTTR
 
@@ -88,4 +88,4 @@ Run-to-run differences of one or two runs between October and November are withi
 - 3 runs per fault scenario and 10 control runs per engine. The MTTR medians rest on 3 (Jev) and 11 (Opus) runs.
 - One prompt (baseline), one Opus effort level (`medium`).
 - The two engines ran one after the other on the same cluster, not interleaved, so cluster drift over the day is not controlled.
-- The recovery check is service-level, as in October; see the October page for how it differs from the LF Edge harness's checks.
+- The recovery check is service-level, as in October. The October page explains how it differs from the LF Edge harness's checks.

@@ -1,10 +1,10 @@
 # Summary: can Jev make bounded operational decisions from observations? (2026-11-02)
 
-This page sums up the whole experiment, from 2026-09-30 to 2026-11-02. It is written for [lfedgeai/AIOps#41](https://github.com/lfedgeai/AIOps/issues/41) and for anyone who wants the findings without reading every results page. It has no new runs. Each figure is copied from the linked results page, which says which run records it came from.
+This page sums up the whole experiment, from 2026-09-30 to 2026-11-02. It is for [lfedgeai/AIOps#41](https://github.com/lfedgeai/AIOps/issues/41) and for anyone who wants the findings without reading every results page. It reports no new runs. Each figure is copied from the linked results page, and that page names the run records the figure came from.
 
 ## What was tested
 
-Jev gets an observation of a system: metrics, logs, traces and cluster state. It answers fixed multiple-choice questions: is there an incident, which component, what kind of fault, and what action to take. We wrote the expected answers by hand, and Jev never sees them. Four tiers, each closer to a real system:
+Jev is the AI engine that this experiment tests. Jev gets an observation of a system: a snapshot of its metrics, logs, traces and cluster state. It answers fixed multiple-choice questions: is there an incident, which component, what kind of fault, and what action to take. We wrote the expected answers by hand, and Jev never sees them. The experiment has four tiers, and each tier is closer to a real system than the one before:
 
 | Tier | Data | What is scored |
 |---|---|---|
@@ -13,20 +13,33 @@ Jev gets an observation of a system: metrics, logs, traces and cluster state. It
 | 3 | The demo on a local kind cluster, the LF Edge group's 10 Kubernetes faults plus a healthy control | the same four, plus time to detect (MTTD) |
 | 4 | Tier 3, plus the harness carrying out Jev's action once from a fixed allowlist | the same, plus recovery and MTTR |
 
-Baselines: Claude Haiku, Sonnet and Opus 5.5 (through the Anthropic API), and qwen3:8b through Ollama on Tier 1.
+Some terms in the table:
+
+- Detection: saying that there is an incident.
+- Localization: naming the component that failed. Some rows below use the LF Edge group's name for it, RCA (root cause analysis).
+- Diagnosis: naming the kind of fault.
+- Healthy control: a run with no fault, where the right answer is "no incident".
+- kind: a tool that runs a small Kubernetes cluster on one machine.
+- Harness: the test program that injects each fault, asks Jev and records the answers.
+- Allowlist: the short, fixed list of actions that the harness is allowed to carry out.
+- MTTR (time to recovery): here, verified MTTR is the time from the fault until the service checks pass and keep passing to the end of the watch, after the one action. It counts only runs that the action fixed, and the tables give the median.
+
+The baselines (other engines that answer the same questions, for comparison) are Claude Haiku, Sonnet and Opus 5.5 (through the Anthropic API), and qwen3:8b through Ollama on Tier 1.
 
 ## Short answer
 
-Jev is good at noticing that something is wrong. It is fast and cheap. It is weaker at saying **where** the problem is, and that matters most once the action is carried out.
+Jev is good at noticing that something is wrong. It is fast and cheap. It is weaker at saying where the problem is, and that matters most once the action is carried out.
 
-- **Detection is strong.** Every fault run was detected at Tiers 2, 3 and 4 (20/20, 18/18, 18/18). Jev answers in about 0.4-1 s.
-- **Localization is the weak spot.** At Tiers 3/4 Jev names the right component on 8-10 of 18 fault runs, while Opus gets 18/18 on the same observations. Jev usually names the caller that logs the errors (`frontend`) instead of the service that failed (`cart`, `valkey-cart`) or the node (K009, 0/3 in every batch).
-- **That gap decides recovery.** At Tier 4, Jev's actions fixed 3 of 18 faults; Opus's fixed 11 of 18 (live, 2026-11-02). Both chose a correct type of action every time. The difference is which component they acted on.
-- **False alarms come from two scenarios.** A single pod restart that has already recovered (K002) is called an incident on every run, and a full volume (K010) on some runs. The healthy control is clean at Tiers 3/4 (0/10). Opus also raises these two, and one more (K006).
-- **Nothing we tried fixed the weak spots.** Prompt wording, the incident threshold and an observation layout that states each row's facts in plain words all left the false alarms where they were. The facts layout gained 2 localization runs (10 → 12 of 18), which is small.
-- **On the Tier 1 decision, no engine is clearly ahead.** Jev, Haiku, Sonnet and Opus all pass 43-53% of runs, and their 95% intervals overlap.
+- Detection is strong. Jev detected every fault run at Tiers 2, 3 and 4 (20/20, 18/18, 18/18). It answers in about 0.4-1 s.
+- Localization is the weak spot. At Tiers 3/4 Jev names the right component on 8-10 of 18 fault runs. Opus gets 18/18 on the same observations. Jev usually names the caller that logs the errors (`frontend`) instead of the service that failed (`cart`, `valkey-cart`) or the node (K009, 0/3 in every batch).
+- That gap decides recovery. At Tier 4, Jev's actions fixed 3 of 18 faults, and Opus's actions fixed 11 of 18 (live, 2026-11-02). Both chose a correct type of action every time. The difference is which component they acted on.
+- False alarms come from two scenarios. A false alarm (a false positive) is an incident reported when there is none. A single pod restart that has already recovered (K002) is called an incident on every run, and a full volume (K010) on some runs. The healthy control is clean at Tiers 3/4 (0/10). Opus also raises these two, and one more (K006).
+- Nothing we tried fixed the weak spots. We tried other prompt wording, other incident thresholds and an observation layout that states each row's facts in plain words. None of them moved the false alarms. The facts layout gained 2 localization runs (10 → 12 of 18), which is small.
+- On the Tier 1 decision, no engine is clearly ahead. Jev, Haiku, Sonnet and Opus all pass 43-53% of runs, and their 95% confidence intervals (the range that likely holds each engine's true pass rate) overlap.
 
 ## By tier
+
+In this table, precision is the share of reported incidents that were real. F1 is one score that combines precision with recall (the share of real faults that were detected).
 
 | | Jev | Best Claude baseline | Page |
 |---|---|---|---|
@@ -46,6 +59,8 @@ Precision, recall and F1 for every tier: [precision-recall-f1](results-2026-11-0
 
 ## Where Jev goes wrong, and what we tried
 
+A prompt variant is a different wording of the same questions. The held-out set is a set of runs that we did not use to write the variants or the layout.
+
 | Problem | Where | What we tried | Result |
 |---|---|---|---|
 | Names the caller, not the failed service | K001, K007, K008 (cart / valkey-cart scaled to zero) | 2 prompt variants, `evidence-options` and `strict-incident` ([prompt-variants](results-2026-11-01-prompt-variants.md)) | No variant clearly beats the baseline on the held-out set |
@@ -58,24 +73,24 @@ Precision, recall and F1 for every tier: [precision-recall-f1](results-2026-11-0
 
 ## Cost and speed
 
-Jev answers in about 0.4-1 s, against about 5 s for Opus through the CLI and longer for local models. A 40-run Tier 4 batch (295 Jev calls) cost about $0.05, estimated from TypeSafe's published price (`JEV_PRICE_*`, [jev-api-notes](jev-api-notes.md)). Claude costs are `n/a` in the records, because we set no Claude price.
+Jev answers in about 0.4-1 s. Opus through the CLI takes about 5 s, and local models take longer. A 40-run Tier 4 batch (295 Jev calls) cost about $0.05, estimated from TypeSafe's published price (`JEV_PRICE_*`, [jev-api-notes](jev-api-notes.md)). Claude costs are `n/a` in the records, because we set no Claude price.
 
 ## Limits
 
-- Small samples: 18 fault runs per Tier 3/4 batch, 3 per scenario. A change of 2-3 runs is within noise.
-- One application (the OpenTelemetry Demo), one cluster layout, and ten fault types.
+- The samples are small: 18 fault runs per Tier 3/4 batch, 3 per scenario. A change of 2-3 runs is within noise.
+- The experiment uses one application (the OpenTelemetry Demo), one cluster layout, and ten fault types.
 - Tier 4 MTTR is single-shot: one answer, carried out once, with no feedback or retry. It is not operational MTTR.
-- Expected answers are our own judgement, written down with a rationale for each scenario. Where Jev disagrees on a borderline case (Tier 1 `ambiguous`, `contradictory`), a person could reasonably side with Jev.
+- The expected answers are our own judgement. We wrote them down with a rationale for each scenario. Where Jev disagrees on a borderline case (Tier 1 `ambiguous`, `contradictory`), a person could reasonably side with Jev.
 - Jev changed during the experiment (`jev-1.13.0` → `jev-1.14.0`). Each page says which version answered.
 
 ## What would help next
 
 These are not planned work. They are where the evidence points:
 
-1. **Localization across a call edge.** Jev's errors share one pattern: the failing service sits one hop behind the service that shows the errors. That is a model question for TypeSafe, not something prompt or layout changes fixed here.
-2. **"Has it already recovered?"** K002 needs the engine to see that the failure is over. The observation window mixes before and after. A layout with separate recent and earlier windows (`time-split`) was designed but not built, because the `facts` results did not meet its gate.
-3. **More runs per scenario** before reading any 2-3 run difference.
+1. Localization across a call edge (one service calling another). Jev's errors share one pattern: the failing service sits one hop behind the service that shows the errors. That is a model question for TypeSafe. Prompt and layout changes did not fix it here.
+2. "Has it already recovered?" K002 needs the engine to see that the failure is over. The observation window mixes the time before and after the recovery. We designed a layout with separate recent and earlier windows (`time-split`) but did not build it, because the `facts` results did not meet its gate (the result it had to reach first).
+3. More runs per scenario before reading any 2-3 run difference.
 
 ## Reproduce
 
-Everything runs from this repository. The offline tests need no key (`./run-all.sh --check`). Live runs need `JEV_API_KEY`, and Tiers 3/4 need the kind testbed (`./setup-k8s.sh`). Commands are in the [README](../README.md). The specs are in `openspec/specs/`, and the history of each change is in `openspec/changes/archive/`.
+Everything runs from this repository. The offline tests need no key (`./run-all.sh --check`). Live runs need `JEV_API_KEY`, and Tiers 3/4 need the kind testbed (`./setup-k8s.sh`). The commands are in the [README](../README.md). The specs are in `openspec/specs/`, and the history of each change is in `openspec/changes/archive/`.

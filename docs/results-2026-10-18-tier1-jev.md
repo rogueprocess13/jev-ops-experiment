@@ -28,7 +28,7 @@ The whole drop is in `log_only_errors`: 10/10 with logs, 0/10 without. That scen
 
 Both scenarios expect `degraded` / `investigate` / human review `yes` / probable cause `unknown`.
 
-Ambiguous scenario: with logs Jev gets the decision right on 8/10 runs. The two misses both say `high` instead of `degraded`. Action and human review are right on all 10. It never answers `unknown` for the cause. It names a specific one every time (configuration 3, application bug 2, dependency failure 3, resource exhaustion 2). Without logs it says `degraded` on all 10 and `unknown` on 2.
+Ambiguous scenario: with logs, Jev gets the decision right on 8/10 runs. The two misses both say `high` instead of `degraded`. Action and human review are right on all 10. It never answers `unknown` for the cause. It names a specific one every time (configuration 3, application bug 2, dependency failure 3, resource exhaustion 2). Without logs, it says `degraded` on all 10 and `unknown` on 2.
 
 Contradictory scenario: 0/10 with logs, 1/10 without. Jev does not answer "investigate" when the signals disagree:
 
@@ -40,7 +40,7 @@ Contradictory scenario: 0/10 with logs, 1/10 without. Jev does not answer "inves
 | high, investigate, yes | 1 | 0 |
 | degraded, investigate, yes (expected) | 0 | 1 |
 
-It splits between waiting (`observe`, 6/10 with logs) and acting (`restart`, 3/10). It names `resource_exhaustion` as the cause on 8 of the 10 runs with logs. The expected answer was written by hand. The reasoning behind it: when signals conflict, a person investigates before anyone changes anything. Jev takes one side of the conflict instead.
+It splits between waiting (`observe`, 6/10 with logs) and acting (`restart`, 3/10). It names `resource_exhaustion` as the cause on 8 of the 10 runs with logs. The expected answer was written by hand. Our reasoning: when signals conflict, a person investigates before anyone changes anything. Jev takes one side of the conflict instead.
 
 ## Cost
 

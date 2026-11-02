@@ -1,6 +1,6 @@
 # Sample run: 2026-10-05, Tier 1, four engines
 
-**This is a sample run, published deliberately** so readers can check the figures in [../results-2026-10-05-tier1-baselines.md](../results-2026-10-05-tier1-baselines.md). Normal runs write to `results/`, which is not in git.
+This is a sample run. We published it on purpose so that readers can check the figures in [../results-2026-10-05-tier1-baselines.md](../results-2026-10-05-tier1-baselines.md). Normal runs write to `results/`, which is not in git.
 
 | File | What it is |
 |---|---|
@@ -13,7 +13,7 @@
 
 All four batches used `--seed 1000`. Each line is one run: the observations exactly as sent, the expected outcome, the engine's decision with its raw response, and the match flags. No API keys are stored.
 
-To rebuild the reports from these files (`report.py` saves a new timestamped report next to the input files, so delete those copies afterwards to keep this folder unchanged):
+`report.py` saves a new timestamped report next to the input files. To keep this folder unchanged, delete those copies afterwards. To rebuild the reports from these files, run:
 
 ```
 python report.py --compare docs/sample-run-2026-10-05/*.jsonl

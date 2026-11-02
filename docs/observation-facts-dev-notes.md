@@ -1,6 +1,6 @@
 # Dev notes: what the raw Tier 3 observation makes Jev work out (2026-11-02)
 
-Written for `openspec/changes/archive/2026-11-02-observation-facts` task 2.1, before any `facts` code. They are based only on the dev set, `results/tier3/10.3-combined` (40 runs, 351 polls, `jev-1.13.0`). The confirm set (`results/tier4/6.2-combined`) was not read for these notes.
+These notes are for `openspec/changes/archive/2026-11-02-observation-facts` task 2.1, written before any `facts` code. They use only the dev set, `results/tier3/10.3-combined` (40 runs, 351 polls, `jev-1.13.0`). We did not read the confirm set (`results/tier4/6.2-combined`) for these notes.
 
 ## Where Jev goes wrong on the dev set
 
@@ -20,7 +20,7 @@ Written for `openspec/changes/archive/2026-11-02-observation-facts` task 2.1, be
 ## What the data cannot support
 
 - **Early polls show no metric change.** On 52 of 351 dev polls, every service's current metrics equal its baseline metrics. The 180 s window then lies mostly before the injection, and span metrics arrive every 60 s. A layout cannot add a change that is not in the data. It can only state that the values are equal.
-- **Some edges are missing.** `valkey-cart` emits no spans, so `dependencies` has no `cart -> valkey-cart` edge. A layout that adds the edge would be adding knowledge of the topology, which is new information. `facts` therefore puts a deployment's readiness next to a service row only when the names match, and lists callees only from the `dependencies` edges that are present.
+- **Some edges are missing.** `valkey-cart` emits no spans, so `dependencies` has no `cart -> valkey-cart` edge. A layout that added the edge would add knowledge of the topology, which is new information. `facts` therefore puts a deployment's readiness next to a service row only when the names match, and lists callees only from the `dependencies` edges that are present.
 - **Restarts have no time.** Pod rows give `restarts_in_window` and `new_since_baseline`, but no timestamp. "How long ago" can be computed only for error logs and events.
 
 ## What `facts` will do (and only this)

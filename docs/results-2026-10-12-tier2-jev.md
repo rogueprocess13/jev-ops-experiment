@@ -143,7 +143,7 @@ The healthy demo is slow. In the healthy runs, checkout had a p95 latency of 9.6
 
 The timing fields do not measure the speed of Jev. Jev is asked once, at a fixed 240 seconds after injection. `diagnosis_seconds` is the time from injection to Jev's reply, so it is about 241 seconds in every run. `detection_seconds` is the time from when the harness saw the fault to Jev's reply, so it measures how fast the fault appeared.
 
-Some expected answers are a judgement call:
+Some expected answers are a judgment call:
 
 - In F004, an engineer can say that payment is the problem, because checkout cannot reach it. We chose checkout.
 - In F006, Jev once named `postgresql` with the right diagnosis. We chose product-catalog because the lock affects its queries. That answer counted as a localization FAIL.

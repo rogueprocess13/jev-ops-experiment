@@ -14,7 +14,7 @@ No. Within every batch, the false alarms (p 0.75 to 0.94) fall inside the range 
 | Tier 4 confirm | `results/tier4/6.2-combined` (40 runs) | `jev-1.13.0` | 280 |
 | Tier 4 live, 2026-11-02 | `results/tier4/11.1-jev-combined` (40 runs) | `jev-1.14.0` | 295 |
 
-Each set has 18 incident runs (K001, K003, K005, K007, K008, K009) and 22 no-incident runs (10 × K000, plus K002, K004, K006, K010). The Opus records are not used: Claude returns no probabilities.
+Each set has 18 incident runs (K001, K003, K005, K007, K008, K009) and 22 no-incident runs (10 × K000, plus K002, K004, K006, K010). This page does not use the Opus records, because Claude returns no probabilities.
 
 ## What the probabilities look like
 
@@ -29,7 +29,7 @@ Every false alarm in all three sets is K002 (cart pods deleted once, recovered) 
 
 ## Threshold sweep
 
-Detection is scored as in Tier 3: the first poll with p ≥ t. Live polling stopped at the first poll with p ≥ 0.5 (Tier 4 acts on it), so above that poll's p a run has no later polls to look at. It is counted as `censored`, not as missed or detected.
+We score detection as in Tier 3: the first poll with p ≥ t. Live polling stopped at the first poll with p ≥ 0.5 (Tier 4 acts on it), so above that poll's p a run has no later polls to look at. We count it as `censored`, not as missed or detected.
 
 | t | Tier 3 dev: detected (censored) / FP runs | Tier 4 confirm | Tier 4 11.1 |
 |---|---|---|---|
@@ -42,19 +42,19 @@ Detection is scored as in Tier 3: the first poll with p ≥ t. Live polling stop
 | 0.85 | 11/18 (7) / 4/22 | 10/18 (8) / 3/22 | 5/18 (13) / 1/22 |
 | 0.90 | 6/18 (12) / 3/22 | 7/18 (11) / 1/22 | 0/18 (18) / 0/22 |
 
-Lowering the cutoff to 0.35 adds a false alarm on the dev set. Raising it to 0.80 or more removes some false alarms only after detections start to drop out. A censored run might still have been detected on a later poll, but polls after a detection were never taken, so this cannot be checked from these records.
+Lowering the cutoff to 0.35 adds a false alarm on the dev set. Raising it to 0.80 or more removes some false alarms only after detections start to drop out. A censored run might still have been detected on a later poll, but polls after a detection were never taken, so we cannot check this from these records.
 
 ## What this means
 
-- **Keep 0.5.** It is in the flat region on every set, so the published figures do not depend on the exact choice.
-- **The false alarms are about the observation, not the cutoff or the wording.** On K002 and K010 the failure has already recovered, but it is probably still visible inside the observation window, and Jev scores it as an ongoing incident. (This is an inference; which fields drive it was not checked here.) A fix has to change what Jev sees. One candidate is the observation's time layout: show clearly what is true now and what happened earlier. That would be a change to the observation builder, with the same leak rules, and has to be tested like any other change.
-- **The ranking of runs is good.** Clean healthy runs never go above 0.42, and every real fault scores at least 0.68. Jev separates "something happened" from "nothing happened" well. It does not separate "is happening" from "has happened".
+- Keep 0.5. It is in the flat region on every set, so the published figures do not depend on the exact choice.
+- The false alarms are about the observation, not the cutoff or the wording. On K002 and K010 the failure has already recovered, but it is probably still visible inside the observation window, and Jev scores it as an ongoing incident. (This is an inference. We did not check here which fields drive it.) A fix has to change what Jev sees. One candidate is the observation's time layout: show clearly what is true now and what happened earlier. That would be a change to the observation builder, with the same leak rules, and has to be tested like any other change.
+- The ranking of runs is good. Clean healthy runs never go above 0.42, and every real fault scores at least 0.68. Jev separates "something happened" from "nothing happened" well. It does not separate "is happening" from "has happened".
 
 ## Limits
 
 - 18 incident runs and 22 no-incident runs per set. False alarms come from 2 scenarios only.
 - Censoring: polling stopped at the first detection, so cutoffs above the detecting poll's p cannot be judged for that run.
-- Choosing a cutoff from these sets and reporting it on the same sets would be fitting to the test set. No cutoff is proposed here, so this does not arise.
+- Choosing a cutoff from these sets and reporting it on the same sets would be fitting to the test set. This page proposes no cutoff, so this does not arise.
 
 ## Script
 

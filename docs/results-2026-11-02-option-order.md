@@ -36,7 +36,7 @@ On Tier 1 (140 runs, both seeds):
 | severity | 4 | 4 | 3 |
 | probable_cause | 13 | 4 | 4 |
 
-The probability shift is the total-variation distance between the two answers' option probabilities, averaged over polls. Tier 2 has only 24 runs; its action question changed 6 of 24 (5 toward earlier) against 5 of 24 for the same order. That is too few to read.
+The probability shift is the total-variation distance between the two answers' option probabilities, averaged over polls. Tier 2 has only 24 runs. Its action question changed 6 of 24 (5 toward earlier) against 5 of 24 for the same order. That is too few to read.
 
 In the baseline order the actions run from mild to drastic (`no_action`, `investigate`, ... `escalate`). Reversed, `escalate` comes first, and the changed answers moved toward the more drastic end.
 
@@ -55,13 +55,13 @@ In the baseline order the actions run from mild to drastic (`no_action`, `invest
 
 Comparison tables: `results/tier3/20261102-order-probe-compare.md`, `results/tier2/20261102-order-probe-compare.md`, `python report.py --compare ... --by-prompt` for Tier 1.
 
-The baseline order scores slightly higher on action on every tier. That fits the bias if the expected actions are mostly mild ones, which the baseline order lists first. This was not checked per scenario. The Tier 3/4 dev RCA gain (7 to 10) is not repeated on the confirm set (10 to 10).
+The baseline order scores slightly higher on action on every tier. That fits the bias if the expected actions are mostly mild ones, which the baseline order lists first. We did not check this per scenario. The Tier 3/4 dev RCA gain (7 to 10) is not repeated on the confirm set (10 to 10).
 
 ## What this means
 
-- **Keep the baseline order, and say it is fixed.** Changing it now would break comparison with every earlier result. The reports already hash it.
-- **Averaging over orders is possible but not worth the calls yet.** Asking each poll in both orders and averaging the probabilities would remove the bias. It doubles the calls to fix about 5% of action answers, which is less than any other open error.
-- **This does not explain the main errors.** Blaming the caller instead of the failing component, and calling recovered failures incidents, do not change with order. The next step stays the observation layout (`openspec/changes/archive/2026-11-02-observation-facts`).
+- Keep the baseline order, and say it is fixed. Changing it now would break comparison with every earlier result. The reports already hash it.
+- Averaging over orders is possible but not worth the calls yet. Asking each poll in both orders and averaging the probabilities would remove the bias. It doubles the calls to fix about 5% of action answers, which is less than any other open error.
+- This does not explain the main errors. Blaming the caller instead of the failing component, and calling recovered failures incidents, do not change with order. The next step stays the observation layout (`openspec/changes/archive/2026-11-02-observation-facts`).
 
 ## Limits
 

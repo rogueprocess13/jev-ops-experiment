@@ -1,6 +1,6 @@
 # Prompt variants: what the baseline wording gets wrong (dev sets only)
 
-Task 6.1 of `openspec/changes/archive/2026-11-02-jev-prompt-variants`, 2026-11-01. This note is the input for writing the candidate variants (task 6.2). Variants are written from this note and from the dev records it cites, and from nothing else.
+Task 6.1 of `openspec/changes/archive/2026-11-02-jev-prompt-variants`, 2026-11-01. This note is the input for the candidate variants (task 6.2). We write the variants from this note and from the dev records it cites, and from nothing else.
 
 ## What was read
 
@@ -12,7 +12,7 @@ Only the dev sets of design D7:
 | 2 | `results/tier2/20261012-190447-369b/` (run 1) | 6 |
 | 3 | `results/tier3/10.3-combined/` (Tier 3 batch: fault runs and control) | 40 |
 
-None of the confirm-set run records were opened for this note: Tier 1 seed 2000, Tier 2 `20261012-195728-7983`, Tier 4 `6.2-combined`. Some confirm-set *totals* were already seen earlier the same day, in `docs/results-2026-11-01-precision-recall-f1.md` and while checking the comparison report against the published scorecards: Tier 4 Jev 5/22 false-positive runs, and Tier 2 run 2-4 3/3 false positives on the healthy control. No per-run detail from those sets went into this note.
+We opened none of the confirm-set run records for this note: Tier 1 seed 2000, Tier 2 `20261012-195728-7983`, Tier 4 `6.2-combined`. We had already seen some confirm-set *totals* earlier the same day, in `docs/results-2026-11-01-precision-recall-f1.md` and while checking the comparison report against the published scorecards: Tier 4 Jev 5/22 false-positive runs, and Tier 2 run 2-4 3/3 false positives on the healthy control. No per-run detail from those sets went into this note.
 
 ## Findings
 
@@ -23,7 +23,7 @@ All 4 Tier 3 false-positive runs are self-healing faults that the scenarios defi
 - K002 (cart pod killed, replaced within 15 s), all three runs: incident on polls 1-12 at p = 0.79-0.94, then p ≈ 0.06-0.09 from poll 13.
 - K010-2 (one OOM kill of cart, restarted in seconds): p ≈ 0.87-0.91 on polls 1-11, then 0.27-0.29.
 
-The drop comes at the same point in every run, about when the transient errors leave the observation window. Jev answers "is something failing or clearly degraded compared with the baseline" about the whole window, not about the present. The question says "right now", but the `true` criterion ("something is failing or clearly degraded compared with the baseline") has no time in it.
+The drop comes at the same point in every run, about when the transient errors leave the observation window. Jev applies "is something failing or clearly degraded compared with the baseline" to the whole window, not to the present. The question says "right now", but the `true` criterion ("something is failing or clearly degraded compared with the baseline") has no time in it.
 
 Healthy control K000: p(incident) 0.05-0.20 on all 150 polls. Jev is not jumpy on a quiet cluster.
 

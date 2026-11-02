@@ -13,7 +13,7 @@ Every figure comes from the 80 run records listed below, through `python -m tier
 | Engine | `jev` (`jev-api`), model `jev-1.13.0` on every poll | `claude-opus` through the `claude` CLI (`claude -p`, transport `claude-cli`, CLI 2.1.303 (Tier 1 used 2.1.289), effort `medium`), model `claude-opus-5-5` on every poll |
 | Fault runs | `results/tier4/20261018-232405-5ada/` (2026-10-19 01:24 to 07:00) | `results/tier4/20261019-070552-2d0e/` (09:05 to 14:29) |
 | Control runs | `results/tier4/20261019-050044-6cc4/` (07:00 to 09:05) | `results/tier4/20261019-122929-7076/` (14:29 to 16:35) |
-| Code | `f9960e6` / `8e14998` | `8e14998` (fault runs) / `6fef6c4` (control runs). Neither commit changes code; they only change docs and `tasks.md` |
+| Code | `f9960e6` / `8e14998` | `8e14998` (fault runs) / `6fef6c4` (control runs). Neither commit changes code. They only change docs and `tasks.md` |
 | Exports | `results/tier4/6.2-combined-scorecard.md`, `6.2-combined-lfedge.jsonl` | `results/tier4/7.5-combined-scorecard.md`, `7.5-combined-lfedge.jsonl` |
 | Runs | 40/40 `ok` | 40/40 `ok` |
 | Engine calls | 280, none failed, none invalid | 250, none failed, none invalid |
@@ -37,7 +37,7 @@ We searched every stored request of the 40 Opus runs for the ten fault names, `j
 
 Opus named the right component and diagnosis on every incident run. Jev missed the component on 8 runs, most often by naming frontend, the caller that logged the errors, instead of cart or the dependency behind it.
 
-MTTD is measured to the scored poll. Opus was scored on the first poll (about 15 s after the fault) on all 18 incident runs, and Jev on 16 of 18 (the second poll on the other two). So most of the difference in MTTD is answer time: Jev answered in 360-1,011 ms (median 429 ms), Opus through the CLI in 3.5-15.4 s (median 4.8 s).
+MTTD is measured to the scored poll. Opus was scored on the first poll (about 15 s after the fault) on all 18 incident runs, and Jev on 16 of 18 (the second poll on the other two). So most of the MTTD difference comes from answer time: Jev answered in 360-1,011 ms (median 429 ms), Opus through the CLI in 3.5-15.4 s (median 4.8 s).
 
 False positives, by scenario:
 
@@ -95,8 +95,8 @@ Three runs per fault are too few to give rates. Read the results as a direction:
 
 The two costs come from different sources and must not be compared as like for like.
 
-- Jev reports no cost. With the user-set prices (`JEV_PRICE_INPUT_PER_MTOK=0.042`, `JEV_PRICE_OUTPUT_PER_MTOK=0`, USD per million tokens; not a published price), the 280 calls (1,176,975 input and 108,231 output tokens) cost an estimated USD 0.049.
-- Opus: the `claude` CLI reported USD 12.83 for the 250 calls (`reported:claude-cli`; 1,637,118 input and 67,248 output tokens). This is the CLI's own figure. On a subscription plan it is notional, not a bill. The CLI caches the prompt, so its reported cost runs about 1.8 times what the same call would cost through the API, and its token counts include the Claude Code harness's own context ([llm-baseline-notes.md](llm-baseline-notes.md)). No API run was made, and no price is built into the code.
+- Jev reports no cost. With the user-set prices (`JEV_PRICE_INPUT_PER_MTOK=0.042`, `JEV_PRICE_OUTPUT_PER_MTOK=0`, USD per million tokens, not a published price), the 280 calls (1,176,975 input and 108,231 output tokens) cost an estimated USD 0.049.
+- Opus: the `claude` CLI reported USD 12.83 for the 250 calls (`reported:claude-cli`, 1,637,118 input and 67,248 output tokens). This is the CLI's own figure. On a subscription plan it is notional, not a bill. The CLI caches the prompt, so its reported cost runs about 1.8 times what the same call would cost through the API, and its token counts include the Claude Code harness's own context ([llm-baseline-notes.md](llm-baseline-notes.md)). No API run was made, and no price is built into the code.
 
 ## Known limits
 
@@ -111,7 +111,7 @@ The two costs come from different sources and must not be compared as like for l
 You do not need the Jev batch to run the Opus batch. It is only needed for the comparison.
 
 1. Start the cluster: `./setup-k8s.sh`, then `./health-check-k8s.sh`.
-2. Choose the transport. Without `ANTHROPIC_API_KEY`, the engine uses the `claude` CLI, as here; the CLI must be installed and logged in. With the key in `.env`, it uses the Anthropic API, which gives different latency and cost figures.
+2. Choose the transport. Without `ANTHROPIC_API_KEY`, the engine uses the `claude` CLI, as here. You must install the CLI and log in to it. With the key in `.env`, it uses the Anthropic API, which gives different latency and cost figures.
 3. Run the fault batch: `./run-all-remediation-experiments K001 K002 K003 K004 K005 K006 K007 K008 K009 K010 --repeats 3 --engine claude-opus` (about 5.5 hours here).
 4. Run the control: `./run-all-remediation-experiments K000 --repeats 10 --engine claude-opus` (about 2 hours here).
 5. Run `python -m tier4 scorecard` and `export-lfedge` on the two run directories.

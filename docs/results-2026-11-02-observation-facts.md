@@ -8,7 +8,7 @@ Facts helps Jev's localization a little and does nothing for the false alarms. O
 
 ## Sources
 
-All calls on 2026-11-02, from `results/facts-phaseA-20261102.sh`. Jev: `jev-latest`, 1,893 calls, 0 errors, 0 invalid replies, $0.484 estimated from the `JEV_PRICE_*` values in `.env`. Opus: Anthropic API, 560 calls, 0 errors. Cost `n/a`, because no `CLAUDE_*_PRICE_*` is set.
+All calls ran on 2026-11-02, from `results/facts-phaseA-20261102.sh`. Jev: `jev-latest`, 1,893 calls, 0 errors, 0 invalid replies, $0.484 estimated from the `JEV_PRICE_*` values in `.env`. Opus: Anthropic API, 560 calls, 0 errors. Cost `n/a`, because no `CLAUDE_*_PRICE_*` is set.
 
 | Set (source) | Jev raw (noise floor, earlier same day) | Jev raw | Jev facts | Jev facts + strict-incident | Opus raw | Opus facts |
 |---|---|---|---|---|---|---|
@@ -62,10 +62,10 @@ On dev, Jev raw → facts flipped 4 localization runs (+3 / −1), against 1 for
 
 What moved, and what did not:
 
-- **K001 and K008 gain in both sets.** Both are `cart` scaled to zero. The dev notes (`docs/observation-facts-dev-notes.md`) found Jev naming `frontend` there because `cart`'s readiness sat in a different list from its request metrics. `facts` puts the deployment's "ready R of D (baseline available A of B)" on the `cart` service row, which is the join the notes described.
-- **K007 diagnosis drops in both sets** (confirm 3 → 2, dev 3 → 1), and localization stays at 1/3. `valkey-cart` emits no spans, so there is no edge to put its readiness next to (dev notes, "some edges are missing"). `facts` cannot help localization here by design.
-- **K002, K009 and the K010 false alarms do not move.** These are the multi-hop and "is it still happening?" cases. Phase B (`time-split`) was meant for these. `facts` was not expected to fix them, and it did not.
-- **Opus is at the ceiling** on RCA and diagnosis with either layout, so it cannot show a layout effect there. Its false alarms (K002, K006, K010 all 3/3) are the same with both layouts.
+- K001 and K008 gain in both sets. Both are `cart` scaled to zero. The dev notes (`docs/observation-facts-dev-notes.md`) found Jev naming `frontend` there because `cart`'s readiness sat in a different list from its request metrics. `facts` puts the deployment's "ready R of D (baseline available A of B)" on the `cart` service row, which is the join the notes described.
+- K007 diagnosis drops in both sets (confirm 3 → 2, dev 3 → 1), and localization stays at 1/3. `valkey-cart` emits no spans, so there is no edge to put its readiness next to (dev notes, "some edges are missing"). `facts` cannot help localization here by design.
+- K002, K009 and the K010 false alarms do not move. These are the multi-hop and "is it still happening?" cases. Phase B (`time-split`) was meant for these. `facts` was not expected to fix them, and it did not.
+- Opus is at the ceiling on RCA and diagnosis with either layout, so it cannot show a layout effect there. Its false alarms (K002, K006, K010 all 3/3) are the same with both layouts.
 
 ## Size and cost
 
@@ -78,10 +78,10 @@ What moved, and what did not:
 
 ## Limits
 
-- 18 fault runs per set, 3 per scenario. The gain is 2 runs on confirm. The design (Risks) said beforehand that a change of 2-3 runs is noise. The measured same-day noise is lower (0 flips on confirm, 1 on dev). Both readings are reported here, and neither is a significance test.
+- 18 fault runs per set, 3 per scenario. The gain is 2 runs on confirm. The design (Risks) said beforehand that a change of 2-3 runs is noise. The measured same-day noise is lower (0 flips on confirm, 1 on dev). This page reports both readings, and neither is a significance test.
 - These are replays: no MTTD, no recovery, no MTTR. Live runs could differ if Jev's answer timing changes which poll is scored.
 - The baseline window ends at injection (design, Risks). `facts` makes "seconds before window end" easy to read. The K002/K010 rows did not move, so the confound did not help here.
-- Both source sets were answered live by `jev-1.13.0`. All replays here went to `jev-latest` on 2026-11-02, so compare replay columns with each other, not with the live column.
+- `jev-1.13.0` answered both source sets live. All replays here went to `jev-latest` on 2026-11-02, so compare replay columns with each other, not with the live column.
 
 ## Gate for Phase B (task 4.1)
 
@@ -90,4 +90,4 @@ Design D6: start Phase B only if Phase A, or the recent-window question, changes
 - K002/K010: no change with `facts`. `strict-incident` removed one K010 false alarm on confirm and none on dev, and it lost a K000 run and a detection. Not beyond noise.
 - RCA: +2 on confirm (0 lost), against 0 same-day flips. That is above the measured noise but inside the pre-stated "2-3 runs is noise" band.
 
-Decision (task 4.1): no-go. The gate is not met, and Phase B (`time-split`) is not started. `facts` stays available as an opt-in layout (`--observation facts`); `raw` stays the default.
+Decision (task 4.1): no-go. The gate is not met, and we did not start Phase B (`time-split`). `facts` stays available as an opt-in layout (`--observation facts`). `raw` stays the default.

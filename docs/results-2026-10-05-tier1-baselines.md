@@ -1,6 +1,6 @@
 # Results: Jev vs. three LLMs on Tier 1 (2026-10-05)
 
-A one-page summary of the first full comparison run. It covers Tier 1 only (synthetic data). When it was written, Tier 2 (the live OpenTelemetry Demo) had not been run yet. It ran on 2026-10-12 ([results-2026-10-12-tier2-jev.md](results-2026-10-12-tier2-jev.md)).
+This page summarizes the first full comparison run. It covers Tier 1 only (synthetic data). When it was written, Tier 2 (the live OpenTelemetry Demo) had not been run yet. It ran on 2026-10-12 ([results-2026-10-12-tier2-jev.md](results-2026-10-12-tier2-jev.md)).
 
 ## What we tested
 
@@ -56,7 +56,7 @@ Every engine answered all 70 runs. There were no invalid answers and no failed c
 1. No engine is clearly better. All four get roughly half the runs fully right, and their likely ranges overlap. 70 runs are not enough to rank them.
 2. Severity and action are mostly right. Human review is what fails. If we ignore human review, Opus is right on 59 of 70 runs and Jev on 53. For Opus, 25 failed runs were wrong only on human review. For Jev, 16 runs were wrong only on human review.
 3. The engines lean in different directions on human review. Jev and qwen ask for a person too often (Jev: 21 unneeded "yes"). Sonnet skips the person when one is needed (27 missed "yes"). Opus errs both ways.
-4. Clear cases are easy, the middle is hard. Healthy and critical situations are close to 100% for everyone. In the in-between scenarios each engine has its own blind spots: Jev is the only one that reliably catches errors that show up only in the logs, but it never gets the hung worker right. Opus is the reverse.
+4. Clear cases are easy. The cases in between are hard. Healthy and critical situations are close to 100% for everyone. In the in-between scenarios, each engine has its own blind spots. Jev is the only one that reliably catches errors that show up only in the logs, but it never gets the hung worker right. Opus is the reverse.
 5. Jev is about 10 times faster than the next engine.
 
 ## Read with care
