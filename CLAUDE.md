@@ -56,6 +56,14 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 - **MTTR in the group's terms.** `mttr_seconds` is fault to remediation written; `mttr_verified_seconds` is fault to the start of the final run of passing service-level checks (at least 60 s, lasting to the end of the 360 s watch), for `recovered_by_action` only. A system that recovers on its own is `recovered_without_action`, never Jev's MTTR. Null, not invented.
 - Tier 4 tests are offline: `FakeKube`, fake undo, fake engine, virtual clock. Never call `kubectl`, kind or Jev from a test.
 
+## Prompt variant rules (`prompts/`)
+
+- **Text only.** A variant (`prompts/<tier>/<name>.yaml`, Tier 4 uses Tier 3's) changes question and option text, nothing else: same question IDs, types and option keys, same parsers and scoring. `prompts/loader.py` rejects anything else. `baseline` must equal the frozen fixtures `tests/fixtures/questions-tier{1,2,3}-pre-variants.json` byte for byte.
+- **Hand-written, with a rationale.** Every variant has a `rationale` and names its `dev_records`. Never generate or tune a variant with Jev or another LLM, and never write one from the confirm set. Judge it on the confirm set, against a same-day baseline replay.
+- **No scenario-specific hints.** Never name a scenario, fault or experiment, or describe a scenario's answer. Rules stated in general terms are allowed only as `style: policy`, labelled in the reports. The leak tests run over every variant file; keep them parametrised.
+- **Version bump on any edit.** Change the text, bump `version`. Records carry `prompt: {name, version, sha256}`; a missing field means `baseline` v1.
+- **Replay is not live.** `python -m tier2|tier3 replay` re-asks stored observations and never touches the source records. Never mix replay and live records in one compare group, and never report replay MTTD, recovery or MTTR.
+
 ## Layout
 
 ```
@@ -67,6 +75,7 @@ generator/server_state.py  seeded, scenario-correlated observations
 generator/app_logs.py      seeded, templated application logs (called by server_state)
 jev/client.py              Jev adapter (only Jev-specific code)
 llm/                       baseline engines: prompt.py (shared questions), claude.py, ollama.py, engines.py
+prompts/                   question wording: <tier>/baseline.yaml and variants, loader.py, compare.py (shared compare layout)
 evaluation/evaluator.py    compare, aggregate, summary text (pure functions)
 evaluation/metrics.py      F1, detection, latency percentiles, reliability, cost (pure); metrics_report.py renders them
 tests/                     offline unit tests
@@ -131,6 +140,8 @@ run-remediation-experiment run-all-remediation-experiments   Tier 4 entry points
 | Tier 4 batch | `./run-all-remediation-experiments [--repeats N]` |
 | Tier 3/4 Opus baseline | add `--engine claude-opus` to `run`/`batch` (API with `ANTHROPIC_API_KEY`, else `claude -p`) |
 | Tier 4 scorecard | `python -m tier4 scorecard results/tier4/<run-id>` (also `export-lfedge`) |
+| Prompt variant | add `--prompt <name>` to `run.py`, `python -m tier2` (`run`, `run-all`), `python -m tier3`/`tier4` (`run`, `batch`) |
+| Replay a variant | `python -m tier3 replay <records> --prompt <name>` (`--dry-run` first; `tier2` likewise), then `python -m tier3 compare <dirs> --dev ... --confirm ...` |
 
 `run.py` and `run-all.sh` need `JEV_API_KEY` in `.env` for the default `jev` engine. Each run makes one real model call, so use small `--runs` while developing.
 
@@ -139,7 +150,7 @@ run-remediation-experiment run-all-remediation-experiments   Tier 4 entry points
 - Python 3.10+. Dependencies: `requests`, `python-dotenv`, `pyyaml`, `pytest`, `anthropic` (baseline engines only).
 - Keep it simple. Docker Compose is allowed **only** for the Tier 2 testbed and Kubernetes (a local kind cluster) **only** for the Tier 3 testbed (which Tier 4 reuses); Tier 1 stays Python-only. Prometheus, Jaeger, OpenSearch and Grafana are the demo's own components, queried over HTTP, not something this repo deploys.
 - Changing a scenario's expected outcome or profile is a change to the experiment, not a bug fix. Update its rationale, the README table and the tests, and say so in the commit.
-- Mark tasks done in `openspec/changes/jev-ops-experiment-v1/tasks.md` (Tier 1), `openspec/changes/otel-demo-tier2/tasks.md` (Tier 2), `openspec/changes/k8s-faults-tier3/tasks.md` (Tier 3) and `openspec/changes/k8s-remediation-tier4/tasks.md` (Tier 4) as work completes.
+- Mark tasks done in `openspec/changes/jev-ops-experiment-v1/tasks.md` (Tier 1), `openspec/changes/otel-demo-tier2/tasks.md` (Tier 2), `openspec/changes/k8s-faults-tier3/tasks.md` (Tier 3), `openspec/changes/k8s-remediation-tier4/tasks.md` (Tier 4) and `openspec/changes/jev-prompt-variants/tasks.md` (prompt variants) as work completes.
 - `results/*` is git-ignored except `.gitkeep`. Do not commit result files unless deliberately publishing a sample run, and label it as such.
 - Commit messages end with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
@@ -154,4 +165,4 @@ Other people clone this repo and run it. Keep these working:
 
 ## Status
 
-v0.1.0 (2026-10-19): all four tiers implemented, tested offline and run live against real Jev. Tier 1: `docs/results-2026-10-05-tier1-baselines.md` and `docs/results-2026-10-18-tier1-jev.md`; `PLAN.md` is marked implemented. Tier 2: `docs/results-2026-10-12-tier2-jev.md`. Tier 3 is done: every fault verified on the kind cluster (`docs/k8s-testbed-notes.md`) and the first full live Jev batch written up in `docs/results-2026-10-18-tier3-jev.md` (2026-10-18). Tier 4 is done: the live Jev batch in `docs/results-2026-10-19-tier4-jev.md` and the Jev vs Claude Opus comparison (Opus through `claude -p`) in `docs/results-2026-10-19-tier4-jev-vs-opus.md` (2026-10-19). Precision, recall and F1 for all four tiers, computed from the existing records for the next steps on lfedgeai/AIOps#41, are in `docs/results-2026-11-01-precision-recall-f1.md` (2026-11-01); the Tier 3/4 scorecards now print detection recall and F1. Prompt variants (change `jev-prompt-variants`, tasks 1-7) are in `docs/results-2026-11-01-prompt-variants.md`; Claude baselines through the Anthropic API (Tier 1 Haiku/Sonnet/Opus, Tier 3/4 Opus replay) in `docs/results-2026-11-01-llm-api-baselines.md`; a fresh live Tier 4 batch, Jev `1.14.0` vs Opus through the API, with MTTR, in `docs/results-2026-11-02-tier4-jev-vs-opus-api.md` (2026-11-02). The cluster is stopped, not deleted; `tier3/testbed/start.sh` brings it back (then set `TIER3_JAEGER_URL` to the control plane's current IP, as `results/tier4/chain-20261101.sh` does).
+v0.1.0 (2026-10-19): all four tiers implemented, tested offline and run live against real Jev. Tier 1: `docs/results-2026-10-05-tier1-baselines.md` and `docs/results-2026-10-18-tier1-jev.md`; `PLAN.md` is marked implemented. Tier 2: `docs/results-2026-10-12-tier2-jev.md`. Tier 3 is done: every fault verified on the kind cluster (`docs/k8s-testbed-notes.md`) and the first full live Jev batch written up in `docs/results-2026-10-18-tier3-jev.md` (2026-10-18). Tier 4 is done: the live Jev batch in `docs/results-2026-10-19-tier4-jev.md` and the Jev vs Claude Opus comparison (Opus through `claude -p`) in `docs/results-2026-10-19-tier4-jev-vs-opus.md` (2026-10-19). Precision, recall and F1 for all four tiers, computed from the existing records for the next steps on lfedgeai/AIOps#41, are in `docs/results-2026-11-01-precision-recall-f1.md` (2026-11-01); the Tier 3/4 scorecards now print detection recall and F1. Prompt variants (change `jev-prompt-variants`, tasks 1-7) are in `docs/results-2026-11-01-prompt-variants.md`; Claude baselines through the Anthropic API (Tier 1 Haiku/Sonnet/Opus, Tier 3/4 Opus replay) in `docs/results-2026-11-01-llm-api-baselines.md`; a fresh live Tier 4 batch, Jev `1.14.0` vs Opus through the API, with MTTR, in `docs/results-2026-11-02-tier4-jev-vs-opus-api.md` (2026-11-02). The prompt variants change is closed (tasks 8.1-8.3); an offline sweep of the incident cutoff over the stored Tier 3/4 polls (`docs/results-2026-11-02-incident-threshold.md`) finds no cutoff that removes the K002/K010 false alarms, so 0.5 stays. The cluster is stopped, not deleted; `tier3/testbed/start.sh` brings it back (then set `TIER3_JAEGER_URL` to the control plane's current IP, as `results/tier4/chain-20261101.sh` does).

@@ -50,6 +50,6 @@
 
 ## 8. Docs and rules
 
-- [ ] 8.1 README: a "Prompt variants" section (how to switch, replay, compare, and the dev/confirm rule) and the `--prompt` option in the command tables
-- [ ] 8.2 `CLAUDE.md`: rules for variants (text only, hand-written with a rationale, no scenario-specific hints, version bump on any edit, confirm set not used to write variants); `prompts/` in the layout; this change's `tasks.md` in the conventions list
-- [ ] 8.3 `./run-all.sh --check` passes on a fresh clone with no key; CI green on Python 3.10-3.13
+- [x] 8.1 README: a "Prompt variants" section (how to switch, replay, compare, and the dev/confirm rule) and the `--prompt` option in the command tables (2026-11-02)
+- [x] 8.2 `CLAUDE.md`: rules for variants (text only, hand-written with a rationale, no scenario-specific hints, version bump on any edit, confirm set not used to write variants); `prompts/` in the layout; this change's `tasks.md` in the conventions list (2026-11-02)
+- [x] 8.3 `./run-all.sh --check` passes on a fresh clone with no key; CI green on Python 3.10-3.13 (2026-11-02: fresh clone of 385eb80, no key: 596 passed, 1 skipped (the Tier 2 demo-checkout test); CI on the push of this change)

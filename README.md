@@ -29,7 +29,8 @@ Every tier has been run live against real Jev, on the dates in the write-ups bel
 | 1 | [Jev, Claude Sonnet, Claude Opus and qwen3:8b, 70 runs each](docs/results-2026-10-05-tier1-baselines.md); [Jev rerun with and without logs](docs/results-2026-10-18-tier1-jev.md) |
 | 2 | [First live Jev runs](docs/results-2026-10-12-tier2-jev.md) |
 | 3 | [Jev, 30 fault runs and 10 healthy controls](docs/results-2026-10-18-tier3-jev.md) |
-| 4 | [Jev, 40 runs](docs/results-2026-10-19-tier4-jev.md); [Jev vs Claude Opus](docs/results-2026-10-19-tier4-jev-vs-opus.md) (fixed by the single action: Jev 4/18 incident runs, Opus 13/18) |
+| 4 | [Jev, 40 runs](docs/results-2026-10-19-tier4-jev.md); [Jev vs Claude Opus](docs/results-2026-10-19-tier4-jev-vs-opus.md) (fixed by the single action: Jev 4/18 incident runs, Opus 13/18); [Jev 1.14.0 vs Opus through the API, with MTTR](docs/results-2026-11-02-tier4-jev-vs-opus-api.md) |
+| all | [Precision, recall and F1](docs/results-2026-11-01-precision-recall-f1.md); [prompt variants](docs/results-2026-11-01-prompt-variants.md) (no variant clearly beats the baseline wording); [incident threshold](docs/results-2026-11-02-incident-threshold.md) (no cutoff removes the false alarms); [Claude baselines through the Anthropic API](docs/results-2026-11-01-llm-api-baselines.md) |
 
 ## How Tiers 3 and 4 compare with the LF Edge AIOps harness
 
@@ -247,6 +248,7 @@ python run.py --runs 70                         # batch, scenarios in rotation (
 python run.py --runs 70 --no-logs               # same, metrics only
 python run.py --runs 50 --scenario contradictory
 python run.py --runs 20 --verbose               # full detail for every run
+python run.py --runs 70 --prompt strict-incident  # same, another question wording
 ```
 
 One Jev request is sent per run, so `--runs 70` makes 70 API calls. Use a multiple of 7 for equal runs per scenario.
@@ -569,6 +571,32 @@ python -m tier4 reset-faults              # undo a recorded action, then the fau
 
 The wrapper scripts pass every argument on to `python -m tier4 batch`.
 
+## Prompt variants (`--prompt`)
+
+Does the wording of the questions matter? A prompt variant changes only the question and option text Jev (or a baseline engine) is asked. Observations, allowed answers, parsing and scoring stay the same. Variants live in `prompts/<tier>/<name>.yaml` (Tier 4 uses Tier 3's); `baseline` is the wording used in every results page before 2026-11-01 and is the default. Every record stores the variant's name, version and `sha256`, and the reports group and label columns by it.
+
+```bash
+# Tier 1: live, the observations come from the seed
+python run.py --runs 70 --seed 2000 --prompt evidence-options
+python report.py --compare results/A.jsonl results/B.jsonl --by-prompt
+
+# Tiers 2-4: replay stored observations under a variant (no testbed needed)
+python -m tier3 replay results/tier4/<run-id> --prompt evidence-options --dry-run   # call count only
+python -m tier3 replay results/tier4/<run-id> --prompt baseline                    # same-day baseline
+python -m tier3 replay results/tier4/<run-id> --prompt evidence-options
+python -m tier3 compare results/tier3/replay/<a> results/tier3/replay/<b> --dev <dir> --confirm <dir>
+python -m tier2 replay results/tier2/<run-id> --prompt strict-incident             # Tier 2 likewise
+```
+
+`--prompt` also works on `python -m tier2 run|run-all`, `python -m tier3 run|batch` and `python -m tier4 run|batch` for live runs. Rules for a fair comparison:
+
+- **Dev and confirm.** Write a variant from the dev records only. Judge it on the held-out confirm records (Tier 1: another seed; Tiers 2-4: other run directories). `compare` prints the confirm table first and warns when a variant's `dev_records` overlap the confirm set.
+- **Compare with a same-day baseline replay**, not the original live answers: the model behind `jev-latest` changes.
+- **Text only, hand-written, general.** A variant has a `rationale`, names its `dev_records`, never names a scenario or hints at an answer (the leak tests run over every variant), and bumps `version` on any edit. Variants that add an operational rule are `style: policy` and labelled in the reports.
+- **Replay limits.** A replay has no wall-clock detection time and carries out no remediation, so Tier 4 recovery and MTTR are not measured. A run whose live polling stopped before the variant would detect is `censored`.
+
+Result so far (2026-11-01): neither `strict-incident` nor `evidence-options` clearly beats the baseline on the confirm sets. See [docs/results-2026-11-01-prompt-variants.md](docs/results-2026-11-01-prompt-variants.md).
+
 ## Docker (optional)
 
 No Python needed on your machine:
@@ -601,7 +629,7 @@ The image contains no credentials, and the build excludes `.env`. Pass them at r
 - The data is synthetic, and the scenarios are simple. Good results here do not show fitness for real infrastructure.
 - Each scenario has a single expected answer. For ambiguous cases more than one answer can be reasonable.
 - Log lines come from a small set of templates. Real logs are much noisier and larger.
-- Results depend on the Jev model version and on how the questions are worded (`QUESTIONS` in `jev/client.py`).
+- Results depend on the Jev model version and on how the questions are worded (`prompts/<tier>/baseline.yaml`; see "Prompt variants").
 
 ## Layout
 
@@ -612,6 +640,7 @@ generator/server_state.py synthetic observations
 generator/app_logs.py     synthetic application logs
 jev/client.py             Jev adapter (the only Jev-specific code)
 llm/                      baseline engines: Claude (API or claude CLI), Ollama
+prompts/                  question wording per tier: baseline and variants, loader, compare layout
 evaluation/evaluator.py   comparison, aggregation, summary text
 tests/                    offline unit tests
 tier2/ tier3/ tier4/      Tiers 2, 3 and 4 (see their sections and CLAUDE.md)
@@ -623,6 +652,9 @@ docs/results-2026-10-18-tier1-jev.md        Tier 1 Jev rerun, with and without l
 docs/results-2026-10-18-tier3-jev.md        first full Tier 3 batch (Jev, 40 runs)
 docs/results-2026-10-19-tier4-jev.md        first full Tier 4 batch (Jev, 40 runs)
 docs/results-2026-10-19-tier4-jev-vs-opus.md  Tier 4 Jev vs Claude Opus
+docs/results-2026-11-01-*.md                precision/recall/F1, prompt variants, Claude API baselines
+docs/results-2026-11-02-tier4-jev-vs-opus-api.md  Tier 4 Jev 1.14.0 vs Opus (API), with MTTR
+docs/results-2026-11-02-incident-threshold.md     incident cutoff sweep over stored polls
 docs/k8s-testbed-notes.md otel-demo-notes.md  testbed facts verified on the cluster and the demo
 openspec/                 specs, design and tasks for this project
 ```
