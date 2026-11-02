@@ -45,7 +45,8 @@ Question types:
 - `usage.input_tokens`, `usage.output_tokens`: token counts.
 - `elapsedMs`: "time from sending the request to receiving the result, including validation". Not pure inference time. The docs do not say exactly where it sits, so the adapter reads it at the top level and falls back to `usage.elapsedMs`.
 - The docs say usage "may include cost in USD" but do not name the field. The adapter takes any numeric `usage` key containing "cost" as reported cost, and keeps the raw `usage` object.
-- Pricing: TypeSafe's API reference (checked 2026-10-05) gives no per-token or per-request price, and real responses carry no cost field, so the project has no default price. (The credit packs at https://thejevai.com/pricing belong to that separate, unaffiliated site, not to TypeSafe.)
+- Pricing: TypeSafe's API reference (checked 2026-10-05) gave no price. Since then, https://docs.typesafe.ai/models.md (checked 2026-11-02) publishes one for Jev 1.13 and 1.14: "$42 per Btok", "$0.042 per Mtok", and "You pay per input token. Output tokens are free." Real responses still carry no cost field. Following the rule in `CLAUDE.md`, the project still has no built-in price. To use the published one, set `JEV_PRICE_INPUT_PER_MTOK=0.042` and `JEV_PRICE_OUTPUT_PER_MTOK=0` in `.env`. (The credit packs at https://thejevai.com/pricing belong to that separate, unaffiliated site, not to TypeSafe.)
+- Models (same page, 2026-11-02): `jev-latest` and `jev-preview` both point to `jev-1.14.0`, so there is no preview model to test. Limits are 64k tokens per request and 32k per question. The `TypeSafe-Danger-Zone-Long-Context: true` header raises both to 262k. The harness does not send it.
 - `elapsedMs` and the "may include cost" wording above come from thejevai.com and are not yet re-checked against docs.typesafe.ai. Real responses on 2026-10-05 had neither.
 - No request ID or rate-limit headers are documented.
 

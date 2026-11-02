@@ -60,8 +60,8 @@ class JevConfig:
     model: str = DEFAULT_MODEL
     timeout_s: float = 30.0
     max_retries: int = 3
-    # Optional, user-supplied USD prices per million tokens. Jev publishes no
-    # per-token rate (only credit packs), so there is no default.
+    # Optional, user-supplied USD prices per million tokens. No default, even
+    # though TypeSafe now publishes one (docs/jev-api-notes.md): see CLAUDE.md.
     price_input_per_mtok: float | None = None
     price_output_per_mtok: float | None = None
 
