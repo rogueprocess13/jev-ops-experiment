@@ -1,6 +1,6 @@
 # Results: prompt variants against the baseline wording, Tiers 1-4 (2026-11-01)
 
-This page answers the "better prompting" next step on [lfedgeai/AIOps#41](https://github.com/lfedgeai/AIOps/issues/41). Can a change to the question wording alone, with the same observations, model and scoring, improve Jev's decisions? Two hand-written variants were tested against the baseline wording on every tier (change `openspec/changes/jev-prompt-variants`). Every figure here is computed from the run records named below.
+This page answers the "better prompting" next step on [lfedgeai/AIOps#41](https://github.com/lfedgeai/AIOps/issues/41). Can a change to the question wording alone, with the same observations, model and scoring, improve Jev's decisions? Two hand-written variants were tested against the baseline wording on every tier (change `openspec/changes/archive/2026-11-02-jev-prompt-variants`). Every figure here is computed from the run records named below.
 
 ## Short answer
 
@@ -109,5 +109,5 @@ The "origin is the component itself, not the caller that reports errors" wording
 - **Sample size.** 18 fault runs at Tiers 2-4 and 10 runs per scenario at Tier 1. No significance test was run, and a two- or three-run difference should not be read as an effect.
 - **Replay, not live.** Tier 2-4 variants answered stored observations. Replay has no wall-clock MTTD and carries out no remediation, so Tier 4 recovery and MTTR were not measured for any variant. No run was censored (a run whose live polling stopped at a detection the variant does not make), so the replayed detection figures are complete for the stored polls.
 - **One model version.** Every variant figure is `jev-1.14.0`. Earlier results pages used `jev-1.13.0`.
-- **The reviews read the test sets.** Both reviewers checked the variants against the expected outcomes, which nudges the wording toward the catalogue. This was stopped after two rounds for that reason (`openspec/changes/jev-prompt-variants/tasks.md`, 6.3).
+- **The reviews read the test sets.** Both reviewers checked the variants against the expected outcomes, which nudges the wording toward the catalogue. This was stopped after two rounds for that reason (`openspec/changes/archive/2026-11-02-jev-prompt-variants/tasks.md`, 6.3).
 - **Two variants only.** These results say these two rewrites did not help. They do not show that no wording would.

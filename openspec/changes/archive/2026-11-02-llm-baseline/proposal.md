@@ -19,7 +19,7 @@ Tier 1 measures how often Jev makes the right operational decision (48.6% over 7
 - `engine-comparison`: engine selection on the command line, engine identity in records and summaries, and the side-by-side comparison report.
 
 ### Modified Capabilities
-<!-- Existing capabilities live under openspec/changes/jev-ops-experiment-v1/specs (not yet archived to openspec/specs). Their requirements still hold for the Jev engine; the new specs add to them rather than change them. -->
+<!-- Existing capabilities live under openspec/changes/archive/2026-11-02-jev-ops-experiment-v1/specs (not yet archived to openspec/specs). Their requirements still hold for the Jev engine; the new specs add to them rather than change them. -->
 
 ## Impact
 

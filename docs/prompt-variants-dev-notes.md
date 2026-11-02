@@ -1,6 +1,6 @@
 # Prompt variants: what the baseline wording gets wrong (dev sets only)
 
-Task 6.1 of `openspec/changes/jev-prompt-variants`, 2026-11-01. This note is the input for writing the candidate variants (task 6.2). Variants are written from this note and from the dev records it cites, and from nothing else.
+Task 6.1 of `openspec/changes/archive/2026-11-02-jev-prompt-variants`, 2026-11-01. This note is the input for writing the candidate variants (task 6.2). Variants are written from this note and from the dev records it cites, and from nothing else.
 
 ## What was read
 

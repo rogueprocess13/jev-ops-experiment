@@ -1,6 +1,6 @@
 # Tier 3 testbed notes (kind, LF Edge Kubernetes faults)
 
-This file lists the facts Tier 3 depends on, where each came from, and what is still unverified. Task group 1 in `openspec/changes/k8s-faults-tier3/tasks.md` fills in the open items on a real cluster. Change `tier3/testbed/pins.env`, the scenarios or the code only together with this file.
+This file lists the facts Tier 3 depends on, where each came from, and what is still unverified. Task group 1 in `openspec/changes/archive/2026-11-02-k8s-faults-tier3/tasks.md` fills in the open items on a real cluster. Change `tier3/testbed/pins.env`, the scenarios or the code only together with this file.
 
 ## LF Edge harness (read 2026-10-14, task 1.5)
 

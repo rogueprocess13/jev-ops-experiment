@@ -22,7 +22,7 @@ The tiers share only the Jev client (`jev/client.py`); Tier 3 also reuses Tier 2
 
 ## Results so far
 
-Every tier has been run live against real Jev, on the dates in the write-ups below. v0.1.0 was tagged on 2026-10-19. Figures come from the run records only.
+Every tier has been run live against real Jev, on the dates in the write-ups below. v0.1.0 was tagged on 2026-10-19. Figures come from the run records only. **Start with the [one-page summary](docs/results-2026-11-02-summary.md) (2026-11-02).**
 
 | Tier | Write-up |
 |---|---|
@@ -30,7 +30,7 @@ Every tier has been run live against real Jev, on the dates in the write-ups bel
 | 2 | [First live Jev runs](docs/results-2026-10-12-tier2-jev.md) |
 | 3 | [Jev, 30 fault runs and 10 healthy controls](docs/results-2026-10-18-tier3-jev.md) |
 | 4 | [Jev, 40 runs](docs/results-2026-10-19-tier4-jev.md); [Jev vs Claude Opus](docs/results-2026-10-19-tier4-jev-vs-opus.md) (fixed by the single action: Jev 4/18 incident runs, Opus 13/18); [Jev 1.14.0 vs Opus through the API, with MTTR](docs/results-2026-11-02-tier4-jev-vs-opus-api.md) |
-| all | [Precision, recall and F1](docs/results-2026-11-01-precision-recall-f1.md); [prompt variants](docs/results-2026-11-01-prompt-variants.md) (no variant clearly beats the baseline wording); [incident threshold](docs/results-2026-11-02-incident-threshold.md) (no cutoff removes the false alarms); [option order](docs/results-2026-11-02-option-order.md) (a small, consistent bias on the action question); [Claude baselines through the Anthropic API](docs/results-2026-11-01-llm-api-baselines.md) |
+| all | [Precision, recall and F1](docs/results-2026-11-01-precision-recall-f1.md); [prompt variants](docs/results-2026-11-01-prompt-variants.md) (no variant clearly beats the baseline wording); [incident threshold](docs/results-2026-11-02-incident-threshold.md) (no cutoff removes the false alarms); [option order](docs/results-2026-11-02-option-order.md) (a small, consistent bias on the action question); [Claude baselines through the Anthropic API](docs/results-2026-11-01-llm-api-baselines.md); [observation layouts](docs/results-2026-11-02-observation-facts.md) (`facts` +2 localization runs, no change to false alarms) |
 
 ## How Tiers 3 and 4 compare with the LF Edge AIOps harness
 
@@ -614,7 +614,7 @@ python -m tier3 compare results/tier3/replay/<raw> results/tier3/replay/<facts> 
 ./run-all-remediation-experiments K001 --observation facts   # live
 ```
 
-`facts` is a pure function of the stored observation, so it can be replayed on any earlier Tier 3/4 record. Replay needs `raw` source records. Why it exists: [openspec/changes/observation-facts](openspec/changes/observation-facts/proposal.md).
+`facts` is a pure function of the stored observation, so it can be replayed on any earlier Tier 3/4 record. Replay needs `raw` source records. Why it exists: [openspec/changes/archive/2026-11-02-observation-facts](openspec/changes/archive/2026-11-02-observation-facts/proposal.md).
 
 ## Docker (optional)
 

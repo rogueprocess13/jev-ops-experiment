@@ -1,6 +1,6 @@
 # Dev notes: what the raw Tier 3 observation makes Jev work out (2026-11-02)
 
-Written for `openspec/changes/observation-facts` task 2.1, before any `facts` code. They are based only on the dev set, `results/tier3/10.3-combined` (40 runs, 351 polls, `jev-1.13.0`). The confirm set (`results/tier4/6.2-combined`) was not read for these notes.
+Written for `openspec/changes/archive/2026-11-02-observation-facts` task 2.1, before any `facts` code. They are based only on the dev set, `results/tier3/10.3-combined` (40 runs, 351 polls, `jev-1.13.0`). The confirm set (`results/tier4/6.2-combined`) was not read for these notes.
 
 ## Where Jev goes wrong on the dev set
 

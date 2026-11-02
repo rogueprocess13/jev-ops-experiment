@@ -61,7 +61,7 @@ The baseline order scores slightly higher on action on every tier. That fits the
 
 - **Keep the baseline order, and say it is fixed.** Changing it now would break comparison with every earlier result. The reports already hash it.
 - **Averaging over orders is possible but not worth the calls yet.** Asking each poll in both orders and averaging the probabilities would remove the bias. It doubles the calls to fix about 5% of action answers, which is less than any other open error.
-- **This does not explain the main errors.** Blaming the caller instead of the failing component, and calling recovered failures incidents, do not change with order. The next step stays the observation layout (`openspec/changes/observation-facts`).
+- **This does not explain the main errors.** Blaming the caller instead of the failing component, and calling recovered failures incidents, do not change with order. The next step stays the observation layout (`openspec/changes/archive/2026-11-02-observation-facts`).
 
 ## Limits
 

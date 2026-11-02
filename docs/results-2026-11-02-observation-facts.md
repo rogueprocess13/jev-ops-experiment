@@ -1,6 +1,6 @@
 # Results: does the `facts` observation layout help? Tier 3/4 replays (2026-11-02)
 
-Change `openspec/changes/observation-facts`, Phase A (tasks 3.1-3.4). The `facts` layout (`tier3/layouts.py`, v1, sha256 `780097d0…`) adds plain per-row statements to the same observation. Examples are a value next to its baseline, deployment readiness next to a service, each edge's callers and callees, and seconds before the window end. It adds no new information and never names a suspect. The question: with the same stored observations laid out this way, do Jev's localization and the K002/K010 false alarms change? Every figure below comes from the replay records, through `docs/analysis/observation_facts.py`.
+Change `openspec/changes/archive/2026-11-02-observation-facts`, Phase A (tasks 3.1-3.4). The `facts` layout (`tier3/layouts.py`, v1, sha256 `780097d0…`) adds plain per-row statements to the same observation. Examples are a value next to its baseline, deployment readiness next to a service, each edge's callers and callees, and seconds before the window end. It adds no new information and never names a suspect. The question: with the same stored observations laid out this way, do Jev's localization and the K002/K010 false alarms change? Every figure below comes from the replay records, through `docs/analysis/observation_facts.py`.
 
 ## Short answer
 

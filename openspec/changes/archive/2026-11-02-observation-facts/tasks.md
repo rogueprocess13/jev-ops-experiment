@@ -31,3 +31,5 @@
 - [x] 5.1 README: "Observation layouts" section and `--observation` in the command tables
 - [x] 5.2 `CLAUDE.md`: layout rules (pure function for replayable layouts, no suspect field, same treatment for every service, version bump, leak tests over every layout); `tier3/layouts.py` in the layout; this tasks file in the conventions
 - [x] 5.3 `./run-all.sh --check` passes on a fresh clone with no key; CI green (2026-11-02, CI run 41462979237 on de7dcbc)
+
+Note (2026-11-02): the `observation-time-split` spec delta was removed before archiving, because Phase B was not started (4.1). It is in git history at 86376e7.
