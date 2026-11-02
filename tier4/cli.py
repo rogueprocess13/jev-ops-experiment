@@ -8,7 +8,8 @@ import sys
 from pathlib import Path
 
 from tier3 import testbed
-from tier3.cli import ENGINES, _write, add_prompt_arg, build_deps, make_config, print_record, resolve_prompt
+from tier3.cli import (ENGINES, _write, add_layout_arg, add_prompt_arg, build_deps, make_config, print_record,
+                       resolve_prompt)
 from tier3.scenarios import ScenarioError, format_list, get_scenario, load_all
 from tier4.runner import DEFAULT_RESULTS
 
@@ -69,6 +70,7 @@ def main(argv=None) -> int:
         p.add_argument("--results-dir", default=str(DEFAULT_RESULTS))
         p.add_argument("--engine", choices=ENGINES, default="jev")
         add_prompt_arg(p)
+        add_layout_arg(p)
     for name, hlp in (("scorecard", "print the scorecard for a results directory"),
                       ("export-lfedge", "write JSONL in the LF Edge harness's field names")):
         p = sub.add_parser(name, help=hlp)
@@ -118,7 +120,7 @@ def main(argv=None) -> int:
     except ScenarioError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    deps, cfg = build_tier4_deps(args.engine, args.prompt_variant), make_config("poll")
+    deps, cfg = build_tier4_deps(args.engine, args.prompt_variant), make_config("poll", args.observation)
     if args.cmd == "run":
         rec = run_experiment(scns[0], deps, cfg, new_run_id(), Path(args.results_dir))
         print_record(rec)

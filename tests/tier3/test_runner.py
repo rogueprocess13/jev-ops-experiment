@@ -214,15 +214,19 @@ def test_placement_recorded(tmp_path):
     assert kube.nodes["jev-worker2"]["spec"].get("taints") == []
 
 
+@pytest.mark.parametrize("layout", __import__("tier3.layouts", fromlist=["x"]).list_layouts())
 @pytest.mark.parametrize("eid", sorted(load_all()))
-def test_nothing_leaks_into_any_poll(tmp_path, eid):
-    """Whole-path leak test: every scenario, every poll, contaminated fixtures."""
+def test_nothing_leaks_into_any_poll(tmp_path, eid, layout):
+    """Whole-path leak test: every scenario, every poll, every layout, contaminated fixtures."""
+    from dataclasses import replace
+
     from jev.client import JevClient, JevConfig
     from tier3.jev_adapter import JevAdapter
 
     scn = get_scenario(eid)
     deps, _, _, eng = make(tmp_path, SeqEngine(ok_decision(**QUIET)))
-    rec = run_experiment(scn, deps, CFG, "r", tmp_path)
+    rec = run_experiment(scn, deps, replace(CFG, layout=layout), "r", tmp_path)
+    assert rec["observation"]["name"] == layout
     assert len(eng.calls) >= 2, "expected several polls"
     adapter = JevAdapter(JevClient(JevConfig(api_key="k"), post=lambda *a: None))
     question_sets = set()

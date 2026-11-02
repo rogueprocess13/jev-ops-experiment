@@ -50,16 +50,20 @@ def _all_tier3_ids():
     return sorted(load_all())
 
 
+@pytest.mark.parametrize("layout", __import__("tier3.layouts", fromlist=["x"]).list_layouts())
 @pytest.mark.parametrize("eid", _all_tier3_ids())
-def test_tier3_replay_sends_only_the_stored_requests(tmp_path, eid):
+def test_tier3_replay_sends_only_the_stored_requests(tmp_path, eid, layout):
     from jev.client import JevClient, JevConfig
     from tier3 import questions
     from tier3.jev_adapter import JevAdapter
+    from tier3.layouts import apply_layout
     src = _tier3_source(tmp_path, eid)
+    before = json.dumps(src, sort_keys=True, default=str)
     for v in _variants(questions, "tier3"):
         eng = Capture(ok_decision(**QUIET), prompt=v)
-        rec = replay_record(src, eng, run_id="rp")
-        assert eng.sent == [p["request"] for p in src["polls"]]
+        rec = replay_record(src, eng, run_id="rp", layout=layout)
+        assert eng.sent == [apply_layout(layout, p["request"])[0] for p in src["polls"]]
+        assert rec["observation"]["name"] == layout
         adapter = JevAdapter(JevClient(JevConfig(api_key="k"), post=lambda *a: None), prompt=v)
         for obs in eng.sent:
             req = adapter.build_request(obs)
@@ -68,6 +72,7 @@ def test_tier3_replay_sends_only_the_stored_requests(tmp_path, eid):
             for s in (*TIER3_SECRETS, eid):
                 assert s not in text, f"{s!r} reached the engine on replay of {eid} under {v.name}"
         assert rec["prompt"] == v.identity and rec["mode"] == "replay"
+    assert json.dumps(src, sort_keys=True, default=str) == before, "replay changed the source record"
 
 
 @pytest.mark.parametrize("eid", ["K000", "K001", "K003", "K009"])

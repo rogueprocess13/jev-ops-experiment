@@ -64,6 +64,15 @@ Experimental benchmark: can Jev AI make bounded operational decisions from obser
 - **Version bump on any edit.** Change the text, bump `version`. Records carry `prompt: {name, version, sha256}`; a missing field means `baseline` v1.
 - **Replay is not live.** `python -m tier2|tier3 replay` re-asks stored observations and never touches the source records. Never mix replay and live records in one compare group, and never report replay MTTD, recovery or MTTR.
 
+## Observation layout rules (`tier3/layouts.py`)
+
+- **Applied after the builder.** A layout maps the observation from `build_observation` to the one sent to the engine, on live runs and on replay. `build_observation`, the scrubber and the byte budget stay as they are. `raw` must stay byte-identical to the builder's output.
+- **No new information.** A replayable layout is a pure function of the observation dict: no clock, cluster, collectors, scenario or record fields. Every word it writes is either copied from its input or in `VOCABULARY` (`test_facts_adds_no_new_tokens_on_every_scenario`).
+- **No suspect field.** Never rank, flag, highlight or name a likely cause, origin or component. Apply the same computation to every row, keep the row order, and describe only each entity's own values (`test_no_suspect_words_in_vocabulary_or_output`).
+- **Version bump on any edit.** Records carry `observation: {name, version, sha256}` (over the layout's source and helpers). A missing field means `raw` v1. Compare refuses one name with two hashes.
+- **Leak tests cover every layout.** The whole-path tests in `tests/tier3/test_runner.py`, `tests/tier4/test_runner.py` and `tests/test_replay.py` are parametrised over `list_layouts()`. `tier3/layouts.py` must not import `tier3.scenarios` or `tier3.faults`.
+- **Every engine gets the same layout.** Jev and the Claude baseline receive the same laid-out observation. Replay refuses sources that are not `raw`.
+
 ## Layout
 
 ```
@@ -97,6 +106,7 @@ tier3/                     Tier 3 (LF Edge Kubernetes faults on kind)
   faults.py deadman.py     ten fault types, ledger, exact restore; dead-man timer
   collectors/kube.py collect.py   thin Kubernetes API client; Tier 2 collectors + cluster state
   observation.py manifest.py      observation builder and scrubber; manifestation and recovery checks
+  layouts.py               observation layouts: raw (default), facts (observation-facts change)
   engine.py jev_adapter.py AIOpsEngine + Decision; the Jev adapter
   questions.py claude_engine.py   shared question set; Claude Opus baseline engine (API or claude -p)
   runner.py evaluate.py report.py cli.py   lifecycle and polling; verdicts; scorecard and exports
@@ -141,6 +151,7 @@ run-remediation-experiment run-all-remediation-experiments   Tier 4 entry points
 | Tier 3/4 Opus baseline | add `--engine claude-opus` to `run`/`batch` (API with `ANTHROPIC_API_KEY`, else `claude -p`) |
 | Tier 4 scorecard | `python -m tier4 scorecard results/tier4/<run-id>` (also `export-lfedge`) |
 | Prompt variant | add `--prompt <name>` to `run.py`, `python -m tier2` (`run`, `run-all`), `python -m tier3`/`tier4` (`run`, `batch`) |
+| Observation layout (Tier 3/4) | add `--observation facts` to `python -m tier3`/`tier4` (`run`, `batch`) or `python -m tier3 replay` |
 | Replay a variant | `python -m tier3 replay <records> --prompt <name>` (`--dry-run` first; `tier2` likewise), then `python -m tier3 compare <dirs> --dev ... --confirm ...` |
 
 `run.py` and `run-all.sh` need `JEV_API_KEY` in `.env` for the default `jev` engine. Each run makes one real model call, so use small `--runs` while developing.

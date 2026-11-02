@@ -128,7 +128,9 @@ def run_batch(scenarios: list[Scenario], deps: Tier4Deps, cfg: Config, results_d
                 deps.base.between_runs()
         if stopped:
             break
+    from tier3.layouts import get_layout
     summary = {"run_id": run_id, "mode": cfg.mode, "repeats": repeats, "stopped_early": stopped,
+               "observation": get_layout(cfg.layout).identity,
                "prompt": engine_prompt(deps.base.engine),
                "scorecard": scorecard_data(records),
                "runs": [{"experiment_id": r["experiment_id"], "status": r["status"],

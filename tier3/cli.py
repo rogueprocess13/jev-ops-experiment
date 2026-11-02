@@ -54,6 +54,12 @@ def add_prompt_arg(p) -> None:
                         f"(default {DEFAULT_VARIANT})")
 
 
+def add_layout_arg(p) -> None:
+    from tier3.layouts import DEFAULT_LAYOUT, list_layouts
+    p.add_argument("--observation", choices=list_layouts(), default=DEFAULT_LAYOUT,
+                   help=f"observation layout (tier3/layouts.py), default {DEFAULT_LAYOUT}")
+
+
 def resolve_prompt(ap, args) -> None:
     """Load --prompt into args.prompt_variant, or exit before any run with the variants listed."""
     from prompts.loader import VariantError
@@ -94,10 +100,11 @@ def build_deps(engine: str = "jev", prompt=None):
                 deadman=Deadman())
 
 
-def make_config(mode: str):
+def make_config(mode: str, layout: str | None = None):
     from tier2.testbed import git_commit
+    from tier3.layouts import DEFAULT_LAYOUT
     from tier3.runner import Config
-    return Config(mode=mode, baseline_wait_s=180, recover_wait_s=60,
+    return Config(mode=mode, baseline_wait_s=180, recover_wait_s=60, layout=layout or DEFAULT_LAYOUT,
                   scrub_terms=("flagd", *FAULT_TYPES),
                   versions=testbed.versions(), git_commit=git_commit())
 
@@ -134,17 +141,25 @@ def _note_replay(path, included: bool) -> None:
 
 
 def _replay(args) -> int:
-    from tier3.replay import load_sources, plan, replay_batch
+    from tier3.layouts import LayoutError
+    from tier3.replay import check_source_layout, load_sources, plan, replay_batch
     from tier3.report import format_scorecard
     p = plan(load_sources(args.records))
+    try:
+        for path, src in p["replay"]:
+            check_source_layout(src, path)
+    except LayoutError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     print(f"replay {len(p['replay'])} record(s), {p['engine_calls']} engine call(s), "
-          f"engine {args.engine}, prompt {args.prompt}; skipped {len(p['skipped'])}", flush=True)
+          f"engine {args.engine}, prompt {args.prompt}, observation {args.observation}; "
+          f"skipped {len(p['skipped'])}", flush=True)
     for s in p["skipped"]:
         print(f"  skipped {s['path']}: {s['reason']} ({s['status']})")
     if args.dry_run or not p["replay"]:
         return 0 if p["replay"] or args.dry_run else 1
     engine = build_engine(args.engine, args.prompt_variant)
-    summary = replay_batch(args.records, engine, args.results_dir)
+    summary = replay_batch(args.records, engine, args.results_dir, layout=args.observation)
     d = Path(args.results_dir) / "replay" / summary["run_id"]
     from tier3.report import load_records
     print(format_scorecard(load_records(d, include_replay=True)))
@@ -168,6 +183,7 @@ def main(argv=None) -> int:
         p.add_argument("--mode", choices=("poll", "single"), default="poll")
         p.add_argument("--engine", choices=ENGINES, default="jev")
         add_prompt_arg(p)
+        add_layout_arg(p)
         p.add_argument("--results-dir", default=str(DEFAULT_RESULTS))
     for name, hlp in (("scorecard", "print the scorecard for a results directory"),
                       ("export-lfedge", "write JSONL in the LF Edge harness's field names"),
@@ -190,6 +206,7 @@ def main(argv=None) -> int:
     rp.add_argument("records", help="a run record, a run directory, or a parent of several")
     rp.add_argument("--engine", choices=ENGINES, default="jev")
     add_prompt_arg(rp)
+    add_layout_arg(rp)
     rp.add_argument("--results-dir", default=str(DEFAULT_RESULTS),
                     help="replay records go to <results-dir>/replay/<run-id>/")
     rp.add_argument("--dry-run", action="store_true",
@@ -249,7 +266,7 @@ def main(argv=None) -> int:
     except ScenarioError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-    deps, cfg = build_deps(args.engine, args.prompt_variant), make_config(args.mode)
+    deps, cfg = build_deps(args.engine, args.prompt_variant), make_config(args.mode, args.observation)
     if args.cmd == "run":
         rec = run_experiment(scns[0], deps, cfg, new_run_id(), Path(args.results_dir))
         print_record(rec)

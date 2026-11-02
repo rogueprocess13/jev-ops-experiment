@@ -26,6 +26,7 @@ from prompts.loader import engine_prompt, record_prompt
 from tier2.runner import new_run_id
 from tier3.engine import STATUS_ERROR, STATUS_OK, Decision
 from tier3.evaluate import evaluate, false_positive_polls
+from tier3.layouts import DEFAULT_LAYOUT, LayoutError, apply_layout, get_layout, record_layout
 from tier3.runner import _decision_dict, _usage, engine_info
 from tier3.scenarios import GroundTruth
 
@@ -70,22 +71,36 @@ def source_truncated(src: dict) -> bool:
     return first is not None and first is polls[-1]
 
 
+def check_source_layout(src: dict, source_path=None) -> None:
+    """A layout is applied to the stored request, so the source must hold a raw one.
+    Laying out an already laid-out observation would record the wrong layout."""
+    ident, _ = record_layout(src)
+    if ident["name"] != DEFAULT_LAYOUT:
+        raise LayoutError(f"{source_path or src.get('run_id')}: source observation layout is "
+                          f"{ident['name']!r}; replay needs raw source records")
+
+
 def replay_record(src: dict, engine, *, run_id: str, source_path: str | None = None,
-                  clock: Callable[[], float] | None = None) -> dict:
+                  clock: Callable[[], float] | None = None, layout: str = DEFAULT_LAYOUT) -> dict:
     import time
     clock = clock or time.time
     started = _iso(clock())
+    lay = get_layout(layout)
+    if not lay.replayable:
+        raise LayoutError(f"{layout} needs live collection; it cannot be replayed")
+    check_source_layout(src, source_path)
 
     # 1. Ask. The engine gets each stored request and nothing else.
     polls: list[dict] = []
     for sp in src["polls"]:
-        obs = sp["request"]
+        obs, layout_notes = apply_layout(layout, sp["request"])
         try:
             d: Decision = engine.decide(obs)
         except Exception as e:  # noqa: BLE001 - recorded on the poll, as in live runs
             d = Decision(status=STATUS_ERROR, message=f"{type(e).__name__}: {e}")
         polls.append({"n": sp["n"], "source_seconds_since_inject": sp.get("seconds_since_inject"),
                       "request": obs, "request_bytes": len(json.dumps(obs).encode()),
+                      **({"trim_notes": layout_notes} if layout_notes else {}),
                       "decision": _decision_dict(d), "_d": d})
 
     # 2. Score, only now reading the source's ground truth.
@@ -100,11 +115,13 @@ def replay_record(src: dict, engine, *, run_id: str, source_path: str | None = N
     rec: dict = {
         "run_id": run_id, "experiment_id": src["experiment_id"], "mode": MODE,
         "source": {"path": source_path, "run_id": src.get("run_id"), "mode": src.get("mode"),
-                   "prompt": record_prompt(src)[0], "engine": src.get("engine"),
+                   "prompt": record_prompt(src)[0], "observation": record_layout(src)[0],
+                   "engine": src.get("engine"),
                    "scored_poll": src.get("scored_poll")},
         "fault": src.get("fault"), "ground_truth": dict(gt),
         "status": "ok", "message": "",
         "engine": engine_info(engine), "prompt": engine_prompt(engine),
+        "observation": lay.identity,
         "polls": polls,
         "scored_poll": scored["n"] if scored else None,
         "jev": scored["decision"] if scored else None,
@@ -149,24 +166,28 @@ def write_replay(rec: dict, dest: Path, source: Path) -> Path:
 
 
 def replay_batch(source: str | Path, engine, results_dir: str | Path, *, run_id: str | None = None,
-                 clock: Callable[[], float] | None = None, out=print) -> dict:
+                 clock: Callable[[], float] | None = None, out=print,
+                 layout: str = DEFAULT_LAYOUT) -> dict:
     """Replay every ok record under `source`. Writes one replay record per source record
     and a summary to `<results_dir>/replay/<run_id>/`."""
     from tier3.report import scorecard_data
 
     run_id = run_id or new_run_id()
     p = plan(load_sources(source))
+    for path, src in p["replay"]:  # refuse before the first engine call
+        check_source_layout(src, path)
     dest = Path(results_dir) / REPLAY_DIR
     records = []
     for i, (path, src) in enumerate(p["replay"], 1):
-        rec = replay_record(src, engine, run_id=run_id, source_path=str(path), clock=clock)
+        rec = replay_record(src, engine, run_id=run_id, source_path=str(path), clock=clock, layout=layout)
         write_replay(rec, dest, path)
         records.append(rec)
         det = "detected" if rec["detect_poll"] else ("censored" if rec["censored"] else "no incident")
         out(f"[{i}/{len(p['replay'])}] {src['experiment_id']:<5} {len(rec['polls']):>2} polls  "
             f"{rec['status']:<5} {det}")
     summary = {"run_id": run_id, "mode": MODE, "source": str(source),
-               "prompt": engine_prompt(engine), "engine": engine_info(engine),
+               "prompt": engine_prompt(engine), "observation": get_layout(layout).identity,
+               "engine": engine_info(engine),
                "replayed": len(records), "skipped": p["skipped"],
                "censored": sum(1 for r in records if r["censored"]),
                "scorecard": scorecard_data(records)}

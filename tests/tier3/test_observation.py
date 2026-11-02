@@ -138,7 +138,8 @@ def test_builder_signature_has_no_scenario_types():
 
 def test_observation_module_does_not_import_scenarios_or_faults():
     for mod in (observation, __import__("tier3.collect", fromlist=["x"]),
-                __import__("tier3.collectors.kube", fromlist=["x"])):
+                __import__("tier3.collectors.kube", fromlist=["x"]),
+                __import__("tier3.layouts", fromlist=["x"])):
         tree = ast.parse(inspect.getsource(mod))
         imported = set()
         for n in ast.walk(tree):

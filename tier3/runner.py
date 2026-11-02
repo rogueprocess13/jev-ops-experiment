@@ -23,6 +23,7 @@ from tier3.engine import STATUS_ERROR as DECISION_ERROR
 from tier3.engine import STATUS_OK as DECISION_OK
 from tier3.engine import Decision
 from tier3.evaluate import DIMENSIONS, UNKNOWN, evaluate, false_positive_polls, seconds_between
+from tier3.layouts import DEFAULT_LAYOUT, apply_layout, get_layout
 from tier3.manifest import manifestation, recovery_problems
 from tier3.observation import build_observation
 from tier3.scenarios import Scenario
@@ -49,6 +50,7 @@ class Config:
     stop_at_first_detection: bool = False  # Tier 4: no-incident scenarios stop at detection too
     extra_hold_s: float = 0.0  # Tier 4: action and recovery time added to the dead-man hold
     scrub_terms: tuple[str, ...] = ()
+    layout: str = DEFAULT_LAYOUT  # observation layout applied after build_observation (tier3/layouts.py)
     versions: dict = field(default_factory=dict)
     git_commit: str | None = None
 
@@ -118,6 +120,7 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
         "status": STATUS_OK, "message": "", "versions": cfg.versions, "git_commit": cfg.git_commit,
         "engine": engine_info(deps.engine),
         "prompt": engine_prompt(deps.engine),
+        "observation": get_layout(cfg.layout).identity,
         "polls": [],
     }
     injected, timer = False, None
@@ -163,6 +166,8 @@ def run_experiment(scn: Scenario, deps: Deps, cfg: Config, run_id: str,
                 t["t_manifest"] = _iso(now)
             obs, trims = build_observation(telemetry, kstate, base_kube,
                                            (*cfg.scrub_terms, scn.experiment_id))
+            obs, layout_notes = apply_layout(cfg.layout, obs)
+            trims = {**trims, **layout_notes}
             try:
                 d: Decision = deps.engine.decide(obs)
             except Exception as e:  # noqa: BLE001 - recorded on the poll; polling goes on
@@ -306,6 +311,7 @@ def run_batch(scenarios: list[Scenario], deps: Deps, cfg: Config, results_dir: P
             break
     summary = {"run_id": run_id, "mode": cfg.mode, "repeats": repeats, "stopped_early": stopped,
                "prompt": engine_prompt(deps.engine),
+               "observation": get_layout(cfg.layout).identity,
                "scorecard": scorecard_data(records),
                "runs": [{"experiment_id": r["experiment_id"], "status": r["status"],
                          "evaluation": r["evaluation"],

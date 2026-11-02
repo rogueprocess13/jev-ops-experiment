@@ -134,10 +134,13 @@ def test_batch_gets_a_fresh_executor_each_run(tmp_path):
     assert json.loads((tmp_path / "b" / "summary.json").read_text())["scorecard"]["overall"]
 
 
+@pytest.mark.parametrize("layout", __import__("tier3.layouts", fromlist=["x"]).list_layouts())
 @pytest.mark.parametrize("eid", sorted(load_all()))
-def test_whole_path_leaks_nothing(tmp_path, eid):
+def test_whole_path_leaks_nothing(tmp_path, eid, layout):
+    from dataclasses import replace
     deps, kube, _ = make(tmp_path, SeqEngine(ok_decision(**QUIET), ok_decision()))
-    rec = run_experiment(get_scenario(eid), deps, CFG, "r", tmp_path)
+    rec = run_experiment(get_scenario(eid), deps, replace(CFG, layout=layout), "r", tmp_path)
+    assert rec["observation"]["name"] == layout
     assert "remediation" in rec
     for p in rec["polls"]:
         text = json.dumps(p["request"]).lower()

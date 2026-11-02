@@ -83,6 +83,8 @@ def dev_records_of(name: str, version: int | None):
 
 def format_compare(paths: list[str], dev: list[str] | None = None,
                    confirm: list[str] | None = None, unpaired: bool = False) -> str:
+    from tier3.layouts import record_layout
     items = load_items([*paths, *(dev or []), *(confirm or [])])
-    return render("Tier 3/4 prompt variant comparison", items, ROWS, engine_name=engine_name,
-                  dev=dev, confirm=confirm, dev_records_of=dev_records_of, notes=NOTES, unpaired=unpaired)
+    return render("Tier 3/4 prompt variant and observation layout comparison", items, ROWS,
+                  engine_name=engine_name, dev=dev, confirm=confirm, dev_records_of=dev_records_of,
+                  notes=NOTES, unpaired=unpaired, layout_of=lambda r: record_layout(r)[0])

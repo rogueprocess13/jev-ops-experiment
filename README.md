@@ -598,6 +598,24 @@ python -m tier2 replay results/tier2/<run-id> --prompt strict-incident          
 
 Result so far (2026-11-01): neither `strict-incident` nor `evidence-options` clearly beats the baseline on the confirm sets. See [docs/results-2026-11-01-prompt-variants.md](docs/results-2026-11-01-prompt-variants.md).
 
+## Observation layouts (`--observation`, Tiers 3/4)
+
+A layout changes how the same evidence is laid out for the engine. It does not change what is collected, the questions or the scoring. Layouts live in `tier3/layouts.py`, and every record stores the layout's name, version and `sha256`.
+
+| Layout | What the engine gets |
+|---|---|
+| `raw` (default) | today's observation, byte for byte |
+| `facts` | the same observation, plus statements computed in code on each row: "available 0 of 1 (baseline available 1 of 1)", "error rate 0.400 (baseline 0.000)", "p95 latency 90.0 ms, 3.0 times baseline (30.0 ms)". Each service row lists its callers and callees with their own availability and errors, and timestamps become seconds before the window end. It adds no information and never names a likely cause |
+
+```bash
+python -m tier3 replay results/tier4/<run-id> --observation facts --dry-run
+python -m tier3 replay results/tier4/<run-id> --observation facts
+python -m tier3 compare results/tier3/replay/<raw> results/tier3/replay/<facts> --confirm results/tier4/<run-id>
+./run-all-remediation-experiments K001 --observation facts   # live
+```
+
+`facts` is a pure function of the stored observation, so it can be replayed on any earlier Tier 3/4 record. Replay needs `raw` source records. Why it exists: [openspec/changes/observation-facts](openspec/changes/observation-facts/proposal.md).
+
 ## Docker (optional)
 
 No Python needed on your machine:

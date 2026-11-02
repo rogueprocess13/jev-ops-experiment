@@ -1,17 +1,17 @@
 ## 1. Layout registry and raw
 
-- [ ] 1.1 `tier3/layouts.py`: registry, `raw` (identity), `VERSION` per layout, source hash (D5); no import of `tier3.scenarios` or `tier3.faults` (isolation test)
-- [ ] 1.2 Apply the layout after `build_observation` in `tier3/runner.py`, and in `tier3/replay.py` on the stored `request`; `--observation` on `python -m tier3` and `python -m tier4` (`run`, `batch`, `replay`); unknown name exits and lists the layouts
-- [ ] 1.3 Record `observation: {name, version, sha256}` in live and replay records; readers treat a missing field as `raw` v1
-- [ ] 1.4 Compare groups by `(engine, prompt, observation)`; error on one name with two hashes
-- [ ] 1.5 Offline tests: `raw` is byte-identical on every fixture poll; the flag reaches Jev and Opus requests; leak tests parametrised over layouts
+- [x] 1.1 `tier3/layouts.py`: registry, `raw` (identity), `VERSION` per layout, source hash (D5); no import of `tier3.scenarios` or `tier3.faults` (isolation test)
+- [x] 1.2 Apply the layout after `build_observation` in `tier3/runner.py`, and in `tier3/replay.py` on the stored `request`; `--observation` on `python -m tier3` and `python -m tier4` (`run`, `batch`, `replay`); unknown name exits and lists the layouts
+- [x] 1.3 Record `observation: {name, version, sha256}` in live and replay records; readers treat a missing field as `raw` v1
+- [x] 1.4 Compare groups by `(engine, prompt, observation)`; error on one name with two hashes
+- [x] 1.5 Offline tests: `raw` is byte-identical on every fixture poll; the flag reaches Jev and Opus requests; leak tests parametrised over layouts
 
 ## 2. facts layout (Phase A)
 
-- [ ] 2.1 Write `docs/observation-facts-dev-notes.md` from the dev set only (`results/tier3/10.3-combined`): what the raw layout makes Jev compute or cross-reference, before writing any fact
-- [ ] 2.2 Implement `facts` (D3, D4): per-service statements, readiness, callees with their own statements, seconds before window end; fixed vocabulary; byte budget re-check
-- [ ] 2.3 Offline tests: "no new tokens", the no-suspect word scan, the callee scenario, determinism, zero-baseline wording, the budget trim
-- [ ] 2.4 Independent review of the vocabulary and an example output by two reviewers who are not the author, before any live call; record it in the commit message
+- [x] 2.1 Write `docs/observation-facts-dev-notes.md` from the dev set only (`results/tier3/10.3-combined`): what the raw layout makes Jev compute or cross-reference, before writing any fact (2026-11-02)
+- [x] 2.2 Implement `facts` (D3, D4): per-service statements, readiness, callees with their own statements, seconds before window end; fixed vocabulary; byte budget re-check
+- [x] 2.3 Offline tests: "no new tokens", the no-suspect word scan, the callee scenario, determinism, zero-baseline wording, the budget trim
+- [x] 2.4 Independent review of the vocabulary and an example output by two reviewers who are not the author, before any live call; record it in the commit message (2026-11-02: two independent reviewer agents, neither shown scenarios, results or dev notes. Fairness review: no blockers; fixed one-way callee placement (callers added), the "same as baseline" judgement, conditional statements, ready-vs-available, per-row budget trimming, time field names; recorded the baseline-end/injection-time confound in design Risks. Correctness review: fixed a Python None in text, ratio from shown values, budget notes, hash covering BYTE_BUDGET and a helper-completeness test, Tier 4 summary identity. Still v1: no facts record existed before the fixes)
 
 ## 3. Phase A replays (real Jev and Opus calls)
 
@@ -28,6 +28,6 @@
 
 ## 5. Docs and rules
 
-- [ ] 5.1 README: "Observation layouts" section and `--observation` in the command tables
-- [ ] 5.2 `CLAUDE.md`: layout rules (pure function for replayable layouts, no suspect field, same treatment for every service, version bump, leak tests over every layout); `tier3/layouts.py` in the layout; this tasks file in the conventions
+- [x] 5.1 README: "Observation layouts" section and `--observation` in the command tables
+- [x] 5.2 `CLAUDE.md`: layout rules (pure function for replayable layouts, no suspect field, same treatment for every service, version bump, leak tests over every layout); `tier3/layouts.py` in the layout; this tasks file in the conventions
 - [ ] 5.3 `./run-all.sh --check` passes on a fresh clone with no key; CI green
