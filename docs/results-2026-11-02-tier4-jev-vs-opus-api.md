@@ -20,6 +20,7 @@ Everything else is unchanged: the same kind cluster, the same eleven scenarios (
 | Runs | 40/40 `ok`, 0 contaminated | 40/40 `ok`, 0 contaminated |
 | Engine calls | 295, none failed, none invalid | 250, none failed, none invalid |
 | Tokens in / out | 1.27M / 114k | 1.47M / 17k |
+| Answer time per call, median / p95 (min-max) | 384 ms / 499 ms (312-599, 295 calls) | 2,157 ms / 4,999 ms (1,423-7,699, 250 calls) |
 | Cost | $0.053 (estimated from `JEV_PRICE_*`) | `n/a` in the records (no `CLAUDE_OPUS_PRICE_*` set) |
 
 Chain script: `results/tier4/chain-20261101.sh`, log `chain-20261101.log`. The fault ledger was clear after every run. Commands: `python -m tier4 scorecard results/tier4/<name>-combined`.
