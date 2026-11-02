@@ -15,10 +15,10 @@
 
 ## 3. Phase A replays (real Jev and Opus calls)
 
-- [ ] 3.1 Dry-run, then replay `raw` and `facts` with `--prompt baseline` on dev (`10.3-combined`) and confirm (`6.2-combined`), engine Jev
-- [ ] 3.2 The same with `--prompt strict-incident` under `facts` (D7)
-- [ ] 3.3 The same pairs with `--engine claude-opus` (API only, `ANTHROPIC_API_KEY`), confirm set
-- [ ] 3.4 Write `docs/results-<date>-observation-facts.md`: confirm tables first, K002/K010 and RCA per scenario, sizes, censoring, limits. Every figure from the records
+- [x] 3.1 Dry-run, then replay `raw` and `facts` with `--prompt baseline` on dev (`10.3-combined`) and confirm (`6.2-combined`), engine Jev
+- [x] 3.2 The same with `--prompt strict-incident` under `facts` (D7)
+- [x] 3.3 The same pairs with `--engine claude-opus` (API only, `ANTHROPIC_API_KEY`), confirm set
+- [x] 3.4 Write `docs/results-<date>-observation-facts.md`: confirm tables first, K002/K010 and RCA per scenario, sizes, censoring, limits. Every figure from the records (2026-11-02: `docs/results-2026-11-02-observation-facts.md`, `docs/analysis/observation_facts.py`)
 
 ## 4. Phase B gate and time-split
 
