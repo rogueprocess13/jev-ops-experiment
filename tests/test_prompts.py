@@ -94,6 +94,20 @@ def test_good_variant_builds_in_schema_order(prompts_dir):
     assert v.questions["ok"]["type"] == "noul"
 
 
+def test_order_reversed_keeps_text_and_reverses_options(prompts_dir):
+    write(prompts_dir, good_doc())
+    base = load_variant("tier1", "v", SCHEMA)
+    d = good_doc()
+    d["questions"]["who"]["order"] = "reversed"
+    d["name"] = "r"
+    write(prompts_dir, d, name="r")
+    rev = load_variant("tier1", "r", SCHEMA)
+    assert list(rev.questions["who"]["criteria"]) == list(reversed(list(base.questions["who"]["criteria"])))
+    assert rev.questions["who"]["criteria"] == base.questions["who"]["criteria"]  # same text per key
+    assert rev.questions["level"] == base.questions["level"]
+    assert rev.sha256 != base.sha256
+
+
 def mutate(fn):
     d = good_doc()
     fn(d)
@@ -120,6 +134,8 @@ def mutate(fn):
     (good_doc(prompt="free text"), "unknown keys ['prompt']"),
     (good_doc(style="clever"), "style must be one of wording, policy"),
     (mutate(lambda d: d.pop("rationale")), "missing keys ['rationale']"),
+    (mutate(lambda d: d["questions"]["who"].update(order="random")), "order: must be one of schema, reversed"),
+    (mutate(lambda d: d["questions"]["ok"].update(order="reversed")), "only a choice question's options"),
 ])
 def test_rejections(prompts_dir, doc, needle):
     write(prompts_dir, doc)

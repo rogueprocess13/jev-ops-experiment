@@ -28,7 +28,11 @@ TOP_KEYS = {"name", "version", "tier", "style", "rationale", "dev_records", "que
 # "wording": only makes the existing questions clearer. "policy": also states, in general
 # operational terms, the rule behind the expected answers. Reports show the two apart.
 STYLES = ("wording", "policy")
-QUESTION_KEYS = {"instructions", "criteria", "criteria_templates"}
+QUESTION_KEYS = {"instructions", "criteria", "criteria_templates", "order"}
+# Option order reaches the engine (Jev's docs say jev-1.13 "leans toward the option that
+# comes first"). A variant may ask for the tier's order reversed, to measure that bias with
+# the same text and keys. Nothing else: no free ordering, so the order stays checkable.
+ORDERS = ("schema", "reversed")
 
 
 class VariantError(ValueError):
@@ -139,8 +143,14 @@ def _build_question(where: str, spec: QuestionSpec, raw) -> dict:
     if missing:
         raise VariantError(f"{where}: no description for options {missing}")
 
+    order = raw.get("order", "schema")
+    if order not in ORDERS:
+        raise VariantError(f"{where}.order: must be one of {', '.join(ORDERS)}")
+    if order != "schema" and spec.type != "choice":
+        raise VariantError(f"{where}.order: only a choice question's options can be reordered")
+    keys = spec.options if order == "schema" else tuple(reversed(spec.options))
     criteria = {k: _text(f"{where}.criteria.{k}", explicit[k]) if k in explicit else from_template[k]
-                for k in spec.options}
+                for k in keys}
     return {"type": spec.type, "instructions": instructions, "criteria": criteria}
 
 

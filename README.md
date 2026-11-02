@@ -30,7 +30,7 @@ Every tier has been run live against real Jev, on the dates in the write-ups bel
 | 2 | [First live Jev runs](docs/results-2026-10-12-tier2-jev.md) |
 | 3 | [Jev, 30 fault runs and 10 healthy controls](docs/results-2026-10-18-tier3-jev.md) |
 | 4 | [Jev, 40 runs](docs/results-2026-10-19-tier4-jev.md); [Jev vs Claude Opus](docs/results-2026-10-19-tier4-jev-vs-opus.md) (fixed by the single action: Jev 4/18 incident runs, Opus 13/18); [Jev 1.14.0 vs Opus through the API, with MTTR](docs/results-2026-11-02-tier4-jev-vs-opus-api.md) |
-| all | [Precision, recall and F1](docs/results-2026-11-01-precision-recall-f1.md); [prompt variants](docs/results-2026-11-01-prompt-variants.md) (no variant clearly beats the baseline wording); [incident threshold](docs/results-2026-11-02-incident-threshold.md) (no cutoff removes the false alarms); [Claude baselines through the Anthropic API](docs/results-2026-11-01-llm-api-baselines.md) |
+| all | [Precision, recall and F1](docs/results-2026-11-01-precision-recall-f1.md); [prompt variants](docs/results-2026-11-01-prompt-variants.md) (no variant clearly beats the baseline wording); [incident threshold](docs/results-2026-11-02-incident-threshold.md) (no cutoff removes the false alarms); [option order](docs/results-2026-11-02-option-order.md) (a small, consistent bias on the action question); [Claude baselines through the Anthropic API](docs/results-2026-11-01-llm-api-baselines.md) |
 
 ## How Tiers 3 and 4 compare with the LF Edge AIOps harness
 
@@ -292,7 +292,7 @@ Every run records:
 
 The batch summary adds token totals and means, total and per-run cost, round-trip, Jev-elapsed and overhead percentiles, attempts, retries and HTTP status counts. The report has a per-scenario telemetry table, so a `--no-logs` report shows what the logs cost in tokens. The summary file also records start and end time, wall time, runs per minute, git commit, Python version, platform, and the Jev URL and model requested.
 
-Cost is never invented. Jev sells credit packs and publishes no per-token price, and its docs say only that usage "may include cost in USD". So:
+Cost is never invented. Jev responses carry no cost field. Since 2026-11-02 TypeSafe publishes a per-token price for Jev 1.13/1.14 ([models page](https://docs.typesafe.ai/models.md): $0.042 per million input tokens, output free), but the harness builds in no price. `.env.example` shows the values to set. So:
 
 1. If the response's `usage` has a numeric cost field, the harness uses it and marks it `reported:usage.<field>`.
 2. Otherwise, if you set `JEV_PRICE_INPUT_PER_MTOK` and `JEV_PRICE_OUTPUT_PER_MTOK`, the harness estimates cost from tokens and marks it `estimated`.
@@ -592,6 +592,7 @@ python -m tier2 replay results/tier2/<run-id> --prompt strict-incident          
 
 - **Dev and confirm.** Write a variant from the dev records only. Judge it on the held-out confirm records (Tier 1: another seed; Tiers 2-4: other run directories). `compare` prints the confirm table first and warns when a variant's `dev_records` overlap the confirm set.
 - **Compare with a same-day baseline replay**, not the original live answers: the model behind `jev-latest` changes.
+- **Option order is fixed.** Jev leans toward options listed first, and changes about 5% of action answers when they are reversed (`baseline-reversed`, [docs/results-2026-11-02-option-order.md](docs/results-2026-11-02-option-order.md)). A variant can only ask for `order: reversed`.
 - **Text only, hand-written, general.** A variant has a `rationale`, names its `dev_records`, never names a scenario or hints at an answer (the leak tests run over every variant), and bumps `version` on any edit. Variants that add an operational rule are `style: policy` and labelled in the reports.
 - **Replay limits.** A replay has no wall-clock detection time and carries out no remediation, so Tier 4 recovery and MTTR are not measured. A run whose live polling stopped before the variant would detect is `censored`.
 
@@ -655,6 +656,7 @@ docs/results-2026-10-19-tier4-jev-vs-opus.md  Tier 4 Jev vs Claude Opus
 docs/results-2026-11-01-*.md                precision/recall/F1, prompt variants, Claude API baselines
 docs/results-2026-11-02-tier4-jev-vs-opus-api.md  Tier 4 Jev 1.14.0 vs Opus (API), with MTTR
 docs/results-2026-11-02-incident-threshold.md     incident cutoff sweep over stored polls
+docs/results-2026-11-02-option-order.md          option-order probe (script in docs/analysis/)
 docs/k8s-testbed-notes.md otel-demo-notes.md  testbed facts verified on the cluster and the demo
 openspec/                 specs, design and tasks for this project
 ```
