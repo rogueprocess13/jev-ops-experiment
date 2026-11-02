@@ -75,7 +75,7 @@ A prompt variant is a different wording of the same questions. The held-out set 
 
 Jev answers about 5 to 7 times faster than Opus through the Anthropic API. In the live Tier 4 batch, Jev's median answer time was 384 ms (p95 499 ms), and Opus's was 2,157 ms (p95 4,999 ms) ([tier4-jev-vs-opus-api](results-2026-11-02-tier4-jev-vs-opus-api.md)). On Tier 1, the median round trips were 352 ms for Jev and 2,540 ms for Opus ([llm-api-baselines](results-2026-11-01-llm-api-baselines.md)). The local model, qwen3:8b, is much slower (p95 35.7 s on Tier 1, [tier1-baselines](results-2026-10-05-tier1-baselines.md)).
 
-In the same Tier 4 batch, Jev used 1.27M input and 114k output tokens over 295 calls, and Opus used 1.47M input and 17k output tokens over 250 calls. Jev's cost was about $0.05, estimated from TypeSafe's published price (`JEV_PRICE_*`, [jev-api-notes](jev-api-notes.md)). Opus's cost is `n/a` in the records, because the API reports no cost and we set no Claude price. The benchmark does not build in a price.
+In the same Tier 4 batch, Jev used 1.27M input and 114k output tokens over 295 calls, and Opus used 1.47M input and 17k output tokens over 250 calls. Jev's cost was about $0.05, estimated from TypeSafe's published price (`JEV_PRICE_*`, [jev-api-notes](jev-api-notes.md)). At Anthropic's published price for Opus 5.5 ($4 input, $20 output per million tokens, set as `CLAUDE_OPUS_PRICE_*`), the same batch cost about $6.21 for Opus, about 117 times Jev's cost. On Tier 1, 70 runs cost about $0.69 for Opus and $0.0043 for Jev (seed 1000). The records themselves keep Opus's cost as `n/a`, because the API reports no cost. These figures are estimates from the recorded token counts.
 
 ## Limits
 
