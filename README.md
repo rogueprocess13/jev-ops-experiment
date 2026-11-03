@@ -22,7 +22,7 @@ The tiers share only the Jev client (`jev/client.py`). Tier 3 also reuses Tier 2
 
 ## Results so far
 
-We ran every tier live against real Jev, on the dates in the write-ups below. v0.1.0 was tagged on 2026-10-19. Figures come from the run records only. **Start with the [executive summary](docs/executive-summary-2026-11-03.md) (2026-11-03) or the [one-page summary](docs/results-2026-11-02-summary.md) (2026-11-02).**
+We ran every tier live against real Jev, on the dates in the write-ups below. v0.1.0 was tagged on 2026-10-19. Figures come from the run records only. **Start with the [one-page summary](docs/results-2026-11-02-summary.md) (2026-11-02).**
 
 | Tier | Write-up |
 |---|---|
